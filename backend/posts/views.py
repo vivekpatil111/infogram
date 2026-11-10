@@ -45,7 +45,9 @@ class PostViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        from media_api.transcode import queue_transcode
+
+        queue_transcode(serializer.save(author=self.request.user))
 
     @action(detail=True, methods=["post", "delete"], url_path="like")
     def like(self, request, pk=None):

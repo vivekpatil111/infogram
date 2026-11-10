@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "discovery",
     "safety",
     "paths",
+    "tips",
 ]
 
 MIDDLEWARE = [
@@ -299,3 +300,18 @@ AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME") or os.getenv("AWS_REGION") 
 AWS_S3_ADDRESSING_STYLE = os.getenv("AWS_S3_ADDRESSING_STYLE", "path" if AWS_S3_ENDPOINT_URL else "auto")
 MEDIA_PUBLIC_BASE_URL = os.getenv("MEDIA_PUBLIC_BASE_URL", "")
 MEDIA_UPLOAD_URL_EXPIRY_SECONDS = int(os.getenv("MEDIA_UPLOAD_URL_EXPIRY_SECONDS", "900"))
+
+
+# Web Push (VAPID). Generate with `python manage.py generate_vapid_keys`; unset = push off.
+VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", FRONTEND_URL if FRONTEND_URL.startswith("https://") else "https://infogram.app")
+
+# Tipping (Razorpay). Use rzp_test_ keys until going live; unset = tipping off.
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+
+# HLS transcoding of uploaded videos (media_api/transcode.py). On by default when
+# media storage is configured; set HLS_ENABLED=0 to keep MP4-only playback.
+HLS_ENABLED = os.getenv("HLS_ENABLED", "1") == "1"

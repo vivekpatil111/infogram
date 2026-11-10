@@ -55,6 +55,9 @@ class Post(models.Model):
     media_type = models.CharField(max_length=10, choices=MediaType.choices)
     media_url = models.URLField(max_length=2048)
     thumbnail_url = models.URLField(max_length=2048, blank=True)
+    # Adaptive streaming (media_api/transcode.py): master playlist once ready.
+    hls_url = models.URLField(max_length=2048, blank=True)
+    hls_status = models.CharField(max_length=12, blank=True)  # "" | pending | processing | ready | failed
     topic = models.CharField(max_length=80, blank=True)
     vertical = models.CharField(max_length=20, blank=True, choices=VERTICAL_CHOICES, db_index=True)
     location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, related_name="posts")

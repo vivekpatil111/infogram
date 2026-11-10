@@ -24,6 +24,18 @@ logger = logging.getLogger(__name__)
 MAX_GROUP_PARTICIPANTS = 32
 
 
+def push_new_message(message):
+    """Push a new DM to the other members' devices."""
+
+    from notifications.push import push_configured, send_to_user
+
+    if not push_configured():
+        return
+    preview = message.body if len(message.body) <= 90 else f"{message.body[:87]}..."
+    for member in message.conversation.members.exclude(user_id=message.sender_id).values_list("user_id", flat=True):
+        send_to_user(member, title=message.sender.username, body=preview, url="/messages", tag=f"c{message.conversation_id}")
+
+
 def conversation_blocked(conversation, sender):
     """A direct (1:1) thread is frozen while either person blocks the other."""
 
@@ -118,6 +130,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         message = serializer.save(conversation=conversation, sender=request.user)
         Conversation.objects.filter(id=conversation.id).update(updated_at=timezone.now())
+        push_new_message(message)
         payload = MessageSerializer(message).data
         # Persisting must not fail because the realtime transport is down.
         try:

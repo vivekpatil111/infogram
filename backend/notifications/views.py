@@ -2,6 +2,7 @@ from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from messaging.models import Message
 
@@ -51,3 +52,43 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
             .count()
         )
         return Response({"notifications": activity, "messages": threads})
+
+
+class PushSubscriptionView(APIView):
+    """GET    /notifications/push/   {enabled, public_key, subscribed_devices}
+    POST   /notifications/push/   {endpoint, keys: {p256dh, auth}}   subscribe this device
+    DELETE /notifications/push/   {endpoint}                         unsubscribe it"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.conf import settings
+
+        from .push import push_configured
+
+        return Response({
+            "enabled": push_configured(),
+            "public_key": settings.VAPID_PUBLIC_KEY if push_configured() else "",
+            "subscribed_devices": request.user.push_subscriptions.count(),
+        })
+
+    def post(self, request):
+        from .models import PushSubscription
+        from .push import push_configured
+
+        if not push_configured():
+            return Response({"detail": "Push notifications aren't set up on this server."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        endpoint = str(request.data.get("endpoint", ""))
+        keys = request.data.get("keys") or {}
+        if not endpoint.startswith("https://") or len(endpoint) > 1000 or not keys.get("p256dh") or not keys.get("auth"):
+            return Response({"detail": "Invalid push subscription."}, status=status.HTTP_400_BAD_REQUEST)
+        PushSubscription.objects.update_or_create(
+            endpoint=endpoint,
+            defaults={"user": request.user, "p256dh": str(keys["p256dh"])[:200], "auth": str(keys["auth"])[:100],
+                      "user_agent": request.headers.get("User-Agent", "")[:300]},
+        )
+        return Response({"subscribed": True}, status=status.HTTP_201_CREATED)
+
+    def delete(self, request):
+        request.user.push_subscriptions.filter(endpoint=str(request.data.get("endpoint", ""))).delete()
+        return Response({"subscribed": False})

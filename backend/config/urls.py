@@ -24,9 +24,10 @@ from accounts.views import FollowRequestViewSet, UserViewSet
 from posts.views import PostViewSet
 from posts.feed import FeedView
 from posts.reels import ReelFeedView
-from notifications.views import NotificationViewSet
+from notifications.views import NotificationViewSet, PushSubscriptionView
 from messaging.views import ConversationViewSet
 from paths.views import LearningPathViewSet
+from tips.views import TipConfigView, TipCreateView, TipListView, TipVerifyView, TipWebhookView
 from discovery.views import ExploreView, LocationDetailView, LocationListView, SearchView, TopicView, VerticalListView
 from stories.views import StoryViewSet
 from safety.views import BlockListViewSet, ProblemReportView, ReportViewSet
@@ -48,6 +49,13 @@ urlpatterns = [
     path("healthz/", healthz, name="healthz"),
     path("admin/", admin.site.urls),
     path("api/v1/auth/", include("accounts.urls")),
+    # Before the router, or notifications/{pk}/ would swallow "push".
+    path("api/v1/notifications/push/", PushSubscriptionView.as_view(), name="push-subscription"),
+    path("api/v1/tips/config/", TipConfigView.as_view(), name="tip-config"),
+    path("api/v1/tips/", TipCreateView.as_view(), name="tip-create"),
+    path("api/v1/tips/verify/", TipVerifyView.as_view(), name="tip-verify"),
+    path("api/v1/tips/webhook/", TipWebhookView.as_view(), name="tip-webhook"),
+    path("api/v1/tips/<str:direction>/", TipListView.as_view(), name="tip-list"),
     path("api/v1/", include(router.urls)),
     path("api/v1/media/", include("media_api.urls")),
     path("api/v1/feed/", FeedView.as_view(), name="feed"),

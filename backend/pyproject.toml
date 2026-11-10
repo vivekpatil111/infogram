@@ -13,7 +13,9 @@ dependencies = [
   "channels>=4.2,<5.0",
   "channels-redis>=4.2,<5.0",
   "daphne>=4.1,<5.0",
-  "whitenoise>=6.8,<7.0"
+  "whitenoise>=6.8,<7.0",
+  "pywebpush>=2.0,<3.0",
+  "imageio-ffmpeg>=0.6,<0.7"
 ]
 
 [tool.ruff]
@@ -28,6 +30,8 @@ include = [
   "media_api*",
   "messaging*",
   "notifications*",
+  "paths*",
   "posts*",
+  "safety*",
   "stories*",
 ]

@@ -15,6 +15,7 @@ class Notification(models.Model):
         COMMENT_LIKE = "comment_like", "Comment like"
         REPLY = "reply", "Reply"
         STORY_MENTION = "story_mention", "Story mention"
+        TIP = "tip", "Tip"
 
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_notifications")
@@ -31,3 +32,14 @@ class Notification(models.Model):
             models.Index(fields=["recipient", "-created_at"]),
             models.Index(fields=["recipient", "read_at"]),
         ]
+
+
+class PushSubscription(models.Model):
+    """One browser/device that asked for push notifications."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="push_subscriptions")
+    endpoint = models.URLField(max_length=1000, unique=True)
+    p256dh = models.CharField(max_length=200)
+    auth = models.CharField(max_length=100)
+    user_agent = models.CharField(max_length=300, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)

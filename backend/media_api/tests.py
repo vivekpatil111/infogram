@@ -90,3 +90,56 @@ class LocalUploadFallbackTests(InfogramAPITestCase):
 
             other = self.as_user(self.make_user("intruder"))
             self.assertEqual(other.put(path, b"\x89PNG", content_type="image/png").status_code, 403)
+
+
+class HlsTranscodeTests(InfogramAPITestCase):
+    def test_transcode_writes_renditions_and_marks_ready_or_failed(self):
+        import subprocess
+        from pathlib import Path
+        from unittest import mock
+
+        from media_api import transcode
+        from posts.models import Post
+
+        author = self.make_user("filmmaker")
+        post = self.make_post(author, media_type="video", media_url="https://cdn.example.com/clip.mp4")
+
+        def fake_download(url, target):
+            subprocess.run([transcode.ffmpeg_path(), "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=1280x720:rate=24:duration=3",
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-f", "mp4", str(target)], check=True)
+
+        uploaded = {}
+
+        def fake_upload(out_dir, prefix):
+            uploaded["files"] = sorted(p.relative_to(out_dir).as_posix() for p in Path(out_dir).rglob("*") if p.is_file())
+            uploaded["prefix"] = prefix
+            return f"https://media.example.com/{prefix}/master.m3u8"
+
+        with mock.patch.object(transcode, "_download", fake_download), mock.patch.object(transcode, "_upload_tree", fake_upload):
+            url = transcode.transcode_post(post.id)
+        post.refresh_from_db()
+        self.assertEqual((post.hls_status, post.hls_url), ("ready", url))
+        self.assertEqual(uploaded["prefix"], f"users/{author.id}/hls/{post.id}")
+        self.assertIn("master.m3u8", uploaded["files"])
+        self.assertIn("v1/index.m3u8", uploaded["files"])  # 480p rendition too
+        self.assertEqual(self.as_user(author).get(f"/api/v1/posts/{post.id}/").data["hls_url"], url)
+
+        with mock.patch.object(transcode, "_download", side_effect=OSError("network down")):
+            self.assertIsNone(transcode.transcode_post(post.id))
+        post.refresh_from_db()
+        self.assertEqual(post.hls_status, "failed")
+
+    def test_new_video_posts_are_queued_when_enabled(self):
+        from unittest import mock
+
+        author = self.make_user("reeler")
+        with mock.patch("media_api.transcode.hls_enabled", return_value=True), \
+                mock.patch("media_api.transcode._run_in_thread") as run, self.captureOnCommitCallbacks(execute=True):
+            response = self.as_user(author).post("/api/v1/posts/", {"media_type": "video", "media_url": "https://cdn.example.com/v.mp4"}, format="json")
+            image = self.as_user(author).post("/api/v1/posts/", {"media_type": "image", "media_url": "https://cdn.example.com/i.jpg"}, format="json")
+        from posts.models import Post
+        import time
+        time.sleep(0.2)
+        self.assertEqual(Post.objects.get(pk=response.data["id"]).hls_status, "pending")
+        self.assertEqual(Post.objects.get(pk=image.data["id"]).hls_status, "")
+        run.assert_called_once_with(response.data["id"])

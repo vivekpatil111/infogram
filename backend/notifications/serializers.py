@@ -29,6 +29,8 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_text(self, notification):
         kind = notification.notification_type
+        if kind == Notification.Type.TIP:
+            return "sent you a tip for your post. 🎉" if notification.post_id else "sent you a tip. 🎉"
         if notification.comment and kind in {Notification.Type.COMMENT, Notification.Type.REPLY, Notification.Type.COMMENT_LIKE}:
             snippet = notification.comment.text
             if len(snippet) > 80:
@@ -49,4 +51,5 @@ class NotificationSerializer(serializers.ModelSerializer):
             Notification.Type.COMMENT_LIKE: "liked your comment.",
             Notification.Type.REPLY: "replied to your comment.",
             Notification.Type.STORY_MENTION: "mentioned you in their story.",
+            Notification.Type.TIP: "sent you a tip for your post. 🎉",
         }[notification.notification_type]

@@ -114,6 +114,7 @@ class PostSerializer(serializers.ModelSerializer):
             "media_type",
             "media_url",
             "thumbnail_url",
+            "hls_url",
             "media",
             "topic",
             "vertical",
@@ -133,7 +134,7 @@ class PostSerializer(serializers.ModelSerializer):
             "seen_by_me",
             "is_suggested",
         ]
-        read_only_fields = ["id", "author", "created_at", "updated_at"]
+        read_only_fields = ["id", "author", "created_at", "updated_at", "hls_url"]
         extra_kwargs = {
             "media_type": {"required": False},
             "media_url": {"required": False},

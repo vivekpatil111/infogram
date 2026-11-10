@@ -60,4 +60,7 @@ class ConversationConsumer(AsyncJsonWebsocketConsumer):
             body=body,
         )
         Conversation.objects.filter(id=self.conversation_id).update(updated_at=timezone.now())
+        from .views import push_new_message
+
+        push_new_message(message)
         return MessageSerializer(message).data
