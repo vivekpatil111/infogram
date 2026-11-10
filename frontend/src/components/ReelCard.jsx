@@ -1,0 +1,52 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send } from 'lucide-react';
+import { formatCount, postLink } from '../api';
+import { useApp } from '../context';
+import { usePostEngagement } from './postActions';
+import { FollowButton } from './Sheets';
+
+export function ReelCard({ reel, onHidden }) {
+  const { currentUser, openProfile, openPost, openShare, openSheet, openReport, showToast } = useApp();
+  const { liked, likeCount, saved, toggleLike, toggleSave } = usePostEngagement(reel);
+  const videoRef = useRef(null);
+  const [muted, setMuted] = useState(true);
+  const [commentCount, setCommentCount] = useState(reel.commentCount);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return undefined;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) video.play().catch(() => {}); else video.pause();
+    }, { threshold: 0.7 });
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, []);
+  const own = reel.authorId === currentUser?.id;
+  const menu = () => openSheet([
+    { label: 'Report', danger: true, hidden: own, onClick: () => openReport({ type: 'post', id: reel.id, name: reel.name }, () => onHidden?.(reel)) },
+    { label: 'Not interested', hidden: own, onClick: () => { onHidden?.(reel); showToast("We'll show fewer reels like this"); } },
+    { label: 'Go to post', onClick: () => openPost(reel) },
+    { label: 'About this account', hidden: own, onClick: () => openProfile(reel.name) },
+    { label: 'Copy link', onClick: () => { navigator.clipboard?.writeText(postLink(reel.id)); showToast('Link copied'); } },
+  ]);
+  return <article className="reel-card">
+    <video ref={videoRef} className="reel-video" src={reel.image} poster={reel.poster || undefined} muted={muted} loop playsInline preload="metadata" onClick={() => setMuted((current) => !current)} onDoubleClick={() => toggleLike(true)}/>
+    <div className="reel-shade"/>
+    <div className="reel-topline"><span>Reels</span><button onClick={() => setMuted((current) => !current)} aria-label={muted ? 'Unmute reel' : 'Mute reel'}>{muted ? '🔇' : '🔊'}</button></div>
+    <div className="reel-copy">
+      {reel.place && <span className="reel-topic">{reel.place}</span>}
+      <div className="reel-profile">
+        <button className="avatar-button" onClick={() => openProfile(reel.name)}><img src={reel.avatar} alt=""/></button>
+        <b role="button" tabIndex={0} onClick={() => openProfile(reel.name)}>{reel.name}</b>
+        {(reel.followStatus === 'none' || reel.followStatus === 'requested') && <FollowButton name={reel.name} initialStatus={reel.followStatus} className="reel-follow"/>}
+      </div>
+      {reel.caption && <p>{reel.caption}</p>}
+    </div>
+    <div className="reel-actions">
+      <button className={liked ? 'reel-liked' : ''} onClick={() => toggleLike()} aria-label={liked ? 'Unlike' : 'Like'}><Heart fill={liked ? 'currentColor' : 'none'}/><span>{formatCount(likeCount)}</span></button>
+      <button onClick={() => openPost(reel, { onCommentAdded: () => setCommentCount((count) => count + 1) })} aria-label="Comments"><MessageCircle/><span>{formatCount(commentCount)}</span></button>
+      <button onClick={() => openShare(reel)} aria-label="Share"><Send/><span>Share</span></button>
+      <button className={saved ? 'reel-saved' : ''} onClick={toggleSave} aria-label={saved ? 'Remove from saved' : 'Save'}><Bookmark fill={saved ? 'currentColor' : 'none'}/><span>{saved ? 'Saved' : 'Save'}</span></button>
+      <button onClick={menu} aria-label="More options"><MoreHorizontal/></button>
+    </div>
+  </article>;
+}

@@ -1,0 +1,86 @@
+# Render Blueprint for Infogram: Render -> New -> Blueprint -> pick this repo.
+#   infogram-api    Django ASGI (REST + WebSockets) via daphne
+#   infogram-redis  Key Value (Redis): feed snapshots, rate limits, live chat fan-out
+#   infogram-web    the React app (static site)
+# PostgreSQL and media storage stay on Neon: paste their values when Render asks
+# for the `sync: false` variables (copy them from backend/.env).
+# If a service name is taken, rename it here and update the URLs below to match.
+
+services:
+  - type: web
+    name: infogram-api
+    runtime: python
+    region: singapore          # next to Neon (AWS ap-southeast-1)
+    plan: free
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install . && python manage.py collectstatic --noinput
+    # Migrations use Neon's direct (unpooled) URL; the app itself uses the pooled one.
+    startCommand: DB_DIRECT=1 python manage.py migrate --noinput && daphne -b 0.0.0.0 -p $PORT config.asgi:application
+    healthCheckPath: /healthz/
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        value: infogram-api.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://infogram-api.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://infogram-web.onrender.com
+      - key: FRONTEND_URL
+        value: https://infogram-web.onrender.com
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: infogram-redis
+          property: connectionString
+      # ---- Neon (copy from backend/.env) ----
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_UNPOOLED
+        sync: false
+      - key: AWS_ENDPOINT_URL_S3
+        sync: false
+      - key: AWS_REGION
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_STORAGE_BUCKET_NAME
+        value: infogram-media
+      # ---- Email for password resets (optional until you have SMTP) ----
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+
+  - type: keyvalue
+    name: infogram-redis
+    region: singapore
+    plan: free
+    maxmemoryPolicy: allkeys-lru   # everything stored has a TTL; evict oldest under pressure
+    ipAllowList: []                # reachable only from your Render services
+
+  - type: web
+    name: infogram-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite              # client-side routes (/explore, /u/name, /post/1, /reset-password)
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://infogram-api.onrender.com/api/v1

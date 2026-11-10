@@ -1,0 +1,26 @@
+# Secrets and local state: never commit
+.env
+.env.*
+!.env.example
+.neon
+
+# Reverse-engineering captures of a personal Instagram session (contain other people's usernames)
+.rea/
+
+# Python
+__pycache__/
+*.egg-info/
+backend/.venv/
+backend/db.sqlite3
+backend/media/
+backend/sent_emails/
+backend/staticfiles/
+
+# Node
+node_modules/
+frontend/dist/
+
+.DS_Store
+
+# Personal Claude Code settings
+.claude/settings.local.json
