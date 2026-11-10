@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronRight, Link2, Search, Send, X } from 'lucide-react';
-import { REPORT_REASONS, createConversation, fetchFollowList, postLink, reportContent, searchContent, sendConversationMessage } from '../api';
+import { REPORT_REASONS, avatarOf, createConversation, fetchFollowList, fetchLikers, fetchProfile, postLink, reportContent, searchContent, sendConversationMessage } from '../api';
 import { useApp } from '../context';
 import { useDebounced } from '../hooks';
 import { ListSkeleton } from './Skeleton';
@@ -9,8 +9,9 @@ const stop = (event) => event.stopPropagation();
 export const followLabel = (status) => (status === 'requested' ? 'Requested' : status === 'following' ? 'Following' : 'Follow');
 
 // Bottom-sheet menu. actions: [{ label, onClick, danger?, hidden? }]
-export function ActionSheet({ actions, onClose }) {
+export function ActionSheet({ actions, title, onClose }) {
   return <div className="modal-backdrop menu-backdrop" onClick={onClose}><section className="post-menu" onClick={stop}>
+    {title && <div className="sheet-title">{title}</div>}
     {actions.filter((action) => !action.hidden).map((action) => <button key={action.label} className={action.danger ? 'menu-danger' : ''} onClick={() => { onClose(); action.onClick(); }}>{action.label}</button>)}
     <button onClick={onClose}>Cancel</button>
   </section></div>;
@@ -63,16 +64,27 @@ function PersonRow({ person, action, onOpen }) {
 }
 
 // Follow button bound to the app-wide follow state.
-export function FollowButton({ name, initialStatus, className = 'person-follow' }) {
-  const { currentUser, followUser, followStatusOf } = useApp();
+// Unfollowing / cancelling a request asks first; followingActions adds extra
+// rows (mute…) to that sheet, like the "Following" menu on a profile.
+export function FollowButton({ name, initialStatus, className = 'person-follow', avatar, followingActions = [] }) {
+  const { currentUser, followUser, followStatusOf, openSheet } = useApp();
   const [busy, setBusy] = useState(false);
   if (!name || name === currentUser?.username) return null;
   const status = followStatusOf(name, initialStatus);
-  const toggle = async () => {
-    if (busy) return;
+  const run = async (follow) => {
     setBusy(true);
-    await followUser(name, status === 'none');
+    await followUser(name, follow);
     setBusy(false);
+  };
+  const toggle = () => {
+    if (busy) return;
+    if (status === 'none') { run(true); return; }
+    const requested = status === 'requested';
+    openSheet([
+      ...(requested ? [] : followingActions),
+      { label: requested ? 'Cancel request' : 'Unfollow', danger: true, onClick: () => run(false) },
+    ], <>{avatar && <img src={avatar} alt=""/>}<span>{requested ? `Cancel your follow request to ${name}?` : `Unfollow ${name}?`}</span>
+      {!requested && <small>If they're private, you'll need to send a new request to see their posts.</small>}</>);
   };
   return <button className={`${className} ${status !== 'none' ? 'is-following' : ''}`} onClick={toggle} disabled={busy}>{followLabel(status)}</button>;
 }
@@ -173,4 +185,34 @@ export function ShareSheet({ post, onClose }) {
     </div>
     <button className="share-copy" onClick={copy}><Link2/>Copy link</button>
   </section></div>;
+}
+
+// "About this account": who this is and how long they've been here.
+export function AboutAccountModal({ username, onClose }) {
+  const { openProfile } = useApp();
+  const [profile, setProfile] = useState(null);
+  const [error, setError] = useState('');
+  useEffect(() => { fetchProfile(username).then((data) => setProfile(data.profile)).catch((requestError) => setError(requestError.message)); }, [username]);
+  const joined = profile?.date_joined ? new Date(profile.date_joined).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : '';
+  return <div className="modal-backdrop new-message-backdrop" onClick={onClose}><section className="new-message-sheet about-account" onClick={stop}>
+    <header><b>About this account</b><button onClick={onClose} aria-label="Close"><X/></button></header>
+    {!profile && !error && <ListSkeleton rows={2}/>}
+    {error && <p className="new-message-status">{error}</p>}
+    {profile && <div className="about-body">
+      <img src={avatarOf(profile)} alt=""/>
+      <b>{profile.username}</b>
+      <p>To help keep our community authentic, we show information about accounts on Infogram.</p>
+      <dl>
+        <div><dt>Date joined</dt><dd>{joined}</dd></div>
+        <div><dt>Account</dt><dd>{profile.is_private ? 'Private' : 'Public'}</dd></div>
+        <div><dt>Posts</dt><dd>{profile.posts_count}</dd></div>
+      </dl>
+      <button onClick={() => { onClose(); openProfile(profile.username); }}>View profile</button>
+    </div>}
+  </section></div>;
+}
+
+// "Liked by" list for a post.
+export function LikesModal({ postId, onClose }) {
+  return <PeopleModal title="Likes" load={() => fetchLikers(postId)} emptyText="No likes yet." onClose={onClose}/>;
 }

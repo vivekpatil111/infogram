@@ -165,6 +165,7 @@ class PublicUserSerializer(serializers.ModelSerializer):
             "posts_muted",
             "stories_muted",
             "posts_count",
+            "date_joined",
         ]
 
     def _viewer_id(self):

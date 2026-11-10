@@ -50,6 +50,16 @@ export function MediaView({ post, className = 'post-image', onDoubleTap }) {
   const [index, setIndex] = useState(0);
   const [burst, setBurst] = useState(0);
   const slide = slides[Math.min(index, slides.length - 1)];
+  const touchStart = useRef(null);
+  const go = (next) => setIndex(Math.max(0, Math.min(slides.length - 1, next)));
+  // Horizontal swipe on touch screens moves between slides.
+  const onTouchStart = (event) => { touchStart.current = event.touches[0].clientX; };
+  const onTouchEnd = (event) => {
+    if (touchStart.current === null || slides.length < 2) return;
+    const dx = event.changedTouches[0].clientX - touchStart.current;
+    touchStart.current = null;
+    if (Math.abs(dx) > 40) go(index + (dx < 0 ? 1 : -1));
+  };
   const doubleTap = () => {
     if (!onDoubleTap) return;
     onDoubleTap();
@@ -60,14 +70,14 @@ export function MediaView({ post, className = 'post-image', onDoubleTap }) {
     const timer = window.setTimeout(() => setBurst(0), 800);
     return () => window.clearTimeout(timer);
   }, [burst]);
-  return <div className="media-frame" onDoubleClick={doubleTap}>
+  return <div className="media-frame" onDoubleClick={doubleTap} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
     {slide.type === 'video'
       ? <InlineVideo key={slide.url} className={className} src={slide.url} poster={slide.poster}/>
       : <FadeImage key={slide.url} className={className} src={slide.url} alt={post.caption ? post.caption.slice(0, 120) : `Post by ${post.name}`} loading="lazy" decoding="async"/>}
     {slides.length > 1 && <>
-      {index > 0 && <button className="media-arrow left" onClick={() => setIndex(index - 1)} aria-label="Previous"><ChevronLeft/></button>}
-      {index < slides.length - 1 && <button className="media-arrow right" onClick={() => setIndex(index + 1)} aria-label="Next"><ChevronRight/></button>}
-      <div className="media-dots">{slides.map((item, dot) => <i key={item.url + dot} className={dot === index ? 'active' : ''}/>)}</div>
+      {index > 0 && <button className="media-arrow left" onClick={() => go(index - 1)} aria-label="Previous"><ChevronLeft/></button>}
+      {index < slides.length - 1 && <button className="media-arrow right" onClick={() => go(index + 1)} aria-label="Next"><ChevronRight/></button>}
+      <div className="media-dots">{slides.map((item, dot) => <button type="button" key={item.url + dot} className={dot === index ? 'active' : ''} onClick={() => go(dot)} aria-label={`Go to slide ${dot + 1}`}/>)}</div>
       <span className="media-counter">{index + 1}/{slides.length}</span>
     </>}
     {burst > 0 && <Heart key={burst} className="like-burst" fill="currentColor"/>}

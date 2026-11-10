@@ -6,15 +6,16 @@ import { FollowButton, PeopleModal } from '../components/Sheets';
 
 const TABS = [['posts', 'Posts', Grid3x3], ['reels', 'Reels', Clapperboard], ['saved', 'Saved', Bookmark]];
 
-export function ProfilePage({ username }) {
-  const { currentUser, setCurrentUser, openPost, openSheet, openReport, openChat, followStatusOf, showToast } = useApp();
-  const [tab, setTab] = useState('posts');
+export function ProfilePage({ username, initialTab, startEditing = false }) {
+  const { currentUser, setCurrentUser, openPost, openSheet, openReport, openChat, openAbout, followStatusOf, showToast } = useApp();
+  const isOwn = username === currentUser?.username;
+  const [tab, setTab] = useState(initialTab === 'saved' && !isOwn ? 'posts' : initialTab || 'posts');
   const [profile, setProfile] = useState(null);
   const [items, setItems] = useState(null);
   const [error, setError] = useState('');
   const [peopleList, setPeopleList] = useState(null);
-  const [editing, setEditing] = useState(false);
-  const isMe = username === currentUser?.username;
+  const [editing, setEditing] = useState(Boolean(startEditing && isOwn));
+  const isMe = isOwn;
 
   const load = () => {
     setItems(null);
@@ -22,7 +23,6 @@ export function ProfilePage({ username }) {
       .then((data) => { setProfile(data.profile); setItems(data.items); setError(''); })
       .catch((requestError) => { setError(requestError.status === 404 ? "Sorry, this page isn't available." : requestError.message); setItems([]); });
   };
-  useEffect(() => { setTab('posts'); setProfile(null); }, [username]);
   useEffect(load, [username, tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error && !profile) return <section className="profile-page"><div className="empty-state"><b>{error}</b><p>The link may be broken, or the account may have been removed.</p></div></section>;
@@ -49,6 +49,7 @@ export function ProfilePage({ username }) {
     { label: 'Report', danger: true, hidden: profile.is_blocked, onClick: () => openReport({ type: 'user', id: profile.username, name: profile.username }) },
     { label: profile.posts_muted ? 'Unmute posts' : 'Mute posts', hidden: profile.is_blocked, onClick: () => toggleMute('posts') },
     { label: profile.stories_muted ? 'Unmute stories' : 'Mute stories', hidden: profile.is_blocked, onClick: () => toggleMute('stories') },
+    { label: 'About this account', onClick: () => openAbout(profile.username) },
     { label: 'Copy profile link', onClick: () => { navigator.clipboard?.writeText(`${window.location.origin}/u/${profile.username}`); showToast('Link copied'); } },
   ]);
   const openList = (kind) => {
@@ -67,7 +68,11 @@ export function ProfilePage({ username }) {
           {isMe && <button onClick={() => setEditing(true)}>Edit profile</button>}
           {!isMe && (profile.is_blocked
             ? <button onClick={toggleBlock}>Unblock</button>
-            : <><FollowButton name={profile.username} initialStatus={profile.follow_status} className="profile-follow"/><button onClick={() => openChat({ id: profile.id, name: profile.username })}>Message</button></>)}
+            : <><FollowButton name={profile.username} initialStatus={profile.follow_status} className="profile-follow" avatar={avatarOf(profile)}
+              followingActions={[
+                { label: profile.posts_muted ? 'Unmute posts' : 'Mute posts', onClick: () => toggleMute('posts') },
+                { label: profile.stories_muted ? 'Unmute stories' : 'Mute stories', onClick: () => toggleMute('stories') },
+              ]}/><button onClick={() => openChat({ id: profile.id, name: profile.username })}>Message</button></>)}
           {!isMe && <button className="profile-settings" onClick={menu} aria-label="Account options"><MoreHorizontal/></button>}
         </div>
         <div className="profile-stats">

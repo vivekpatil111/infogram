@@ -188,6 +188,7 @@ const userRow = (user) => ({
   followers: user.followers_count || 0,
   followStatus: user.follow_status || (user.is_following ? 'following' : user.is_requested ? 'requested' : 'none'),
   isPrivate: Boolean(user.is_private),
+  joined: user.date_joined || null,
 });
 
 // ---------------------------------------------------------------------------
@@ -345,6 +346,11 @@ export const setUserFollow = (username, follow) =>
 
 export async function fetchFollowList(username, kind) {
   const response = await apiRequest(`/users/${encodeURIComponent(username)}/${kind}/?limit=50`);
+  return response.results.map(userRow);
+}
+
+export async function fetchLikers(postId) {
+  const response = await apiRequest(`/posts/${postId}/likers/?limit=50`);
   return response.results.map(userRow);
 }
 

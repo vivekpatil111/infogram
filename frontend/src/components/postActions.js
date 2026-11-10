@@ -32,7 +32,7 @@ export function usePostEngagement(post) {
 
 // The "…" menu for a post. onHidden / onDeleted let the list drop the card.
 export function usePostMenu() {
-  const { currentUser, openSheet, openReport, openPost, openProfile, followUser, followStatusOf, showToast } = useApp();
+  const { currentUser, openSheet, openReport, openPost, openAbout, followUser, followStatusOf, showToast } = useApp();
   return (post, { onHidden, onDeleted, inModal = false } = {}) => {
     const own = post.authorId === currentUser?.id;
     const status = followStatusOf(post.name, post.followStatus);
@@ -41,11 +41,11 @@ export function usePostMenu() {
         { label: 'Delete post', danger: true, onClick: async () => {
           try { await deletePost(post.id); showToast('Post deleted'); onDeleted?.(post); } catch (error) { showToast(`Delete: ${error.message}`); }
         } },
-      ]) },
+      ], 'Delete this post? This can\'t be undone.') },
       { label: 'Report', danger: true, hidden: own, onClick: () => openReport({ type: 'post', id: post.id, name: post.name }, () => onHidden?.(post)) },
       { label: 'Unfollow', danger: true, hidden: own || status !== 'following', onClick: () => followUser(post.name, false) },
       { label: 'Go to post', hidden: inModal, onClick: () => openPost(post) },
-      { label: 'About this account', hidden: own, onClick: () => openProfile(post.name) },
+      { label: 'About this account', hidden: own, onClick: () => openAbout(post.name) },
       { label: 'Copy link', onClick: () => { navigator.clipboard?.writeText(postLink(post.id)); showToast('Link copied'); } },
       { label: 'Hide', hidden: own || !onHidden, onClick: () => { onHidden(post); showToast('Post hidden from your feed'); } },
     ]);

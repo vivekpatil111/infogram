@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ImagePlus, MoreHorizontal, PenSquare, Search, Send } from 'lucide-react';
 import {
   createConversation, fetchConversations, fetchMessages, markConversationRead, normalizeMessage,
-  openConversationSocket, sendConversationMessage, setUserBlocked, uploadMedia,
+  fetchPost, openConversationSocket, sendConversationMessage, setUserBlocked, uploadMedia,
 } from '../api';
+import { EmojiButton, insertAtCaret } from '../components/Emoji';
 import { useApp } from '../context';
 import { NewMessageModal } from '../components/Sheets';
 import { ListSkeleton, Spinner } from '../components/Skeleton';
@@ -17,11 +18,31 @@ function MessageBody({ text, onOpenPost }) {
   if (IMAGE_URL.test(trimmed)) return <img className="message-media" src={trimmed} alt="Shared photo"/>;
   if (VIDEO_URL.test(trimmed)) return <video className="message-media" src={trimmed} controls playsInline preload="metadata"/>;
   const post = text.match(POST_LINK);
-  if (post) {
-    const label = text.replace(POST_LINK, '').replace(/:\s*$/, '').trim() || 'Shared a post';
-    return <>{label}<button className="message-post-link" onClick={() => onOpenPost(Number(post[1]))}>View post</button></>;
-  }
+  if (post) return <SharedPostCard postId={Number(post[1])} onOpenPost={onOpenPost}/>;
   return text;
+}
+
+// A post shared in a chat shows as a tappable preview, not a bare link.
+const sharedPostCache = new Map();
+function SharedPostCard({ postId, onOpenPost }) {
+  const [post, setPost] = useState(sharedPostCache.get(postId) || null);
+  const [missing, setMissing] = useState(false);
+  useEffect(() => {
+    if (post) return;
+    let cancelled = false;
+    fetchPost(postId)
+      .then((data) => { sharedPostCache.set(postId, data); if (!cancelled) setPost(data); })
+      .catch(() => { if (!cancelled) setMissing(true); });
+    return () => { cancelled = true; };
+  }, [postId]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (missing) return <span className="shared-post missing">Post unavailable</span>;
+  return <button className="shared-post" onClick={() => onOpenPost(postId)}>
+    {post ? <>
+      <span className="shared-post-head"><img src={post.avatar} alt=""/><b>{post.name}</b></span>
+      {post.mediaType === 'video' && !post.poster ? <video src={post.image} muted preload="metadata"/> : <img className="shared-post-media" src={post.poster || post.image} alt=""/>}
+      {post.caption && <small>{post.caption.slice(0, 90)}</small>}
+    </> : <span className="sk shared-post-skeleton"/>}
+  </button>;
 }
 
 export function MessagesPage({ target, onTargetHandled, unreadMessages }) {
@@ -35,6 +56,7 @@ export function MessagesPage({ target, onTargetHandled, unreadMessages }) {
   const [newMessageOpen, setNewMessageOpen] = useState(false);
   const bottomRef = useRef(null);
   const fileRef = useRef(null);
+  const composerRef = useRef(null);
 
   const loadList = () => fetchConversations(currentUser.id)
     .then((rows) => setConversations((current) => rows.map((row) => {
@@ -147,7 +169,8 @@ export function MessagesPage({ target, onTargetHandled, unreadMessages }) {
         <form className="message-composer" onSubmit={send}>
           <button type="button" aria-label="Send a photo or video" onClick={() => fileRef.current?.click()} disabled={sending}><ImagePlus/></button>
           <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" hidden onChange={sendMedia}/>
-          <input value={composer} onChange={(event) => setComposer(event.target.value)} placeholder={sending ? 'Sending…' : 'Message…'} maxLength="5000"/>
+          <EmojiButton onPick={(emoji) => insertAtCaret(composerRef.current, composer, emoji, setComposer)}/>
+          <input ref={composerRef} value={composer} onChange={(event) => setComposer(event.target.value)} placeholder={sending ? 'Sending…' : 'Message…'} maxLength="5000"/>
           <button className="send-message" disabled={!composer.trim() || sending} aria-label="Send message"><Send/></button>
         </form>
       </>}

@@ -6,7 +6,7 @@ import { usePostEngagement } from './postActions';
 import { FollowButton } from './Sheets';
 
 export function ReelCard({ reel, onHidden }) {
-  const { currentUser, openProfile, openPost, openShare, openSheet, openReport, showToast } = useApp();
+  const { currentUser, openProfile, openPost, openShare, openSheet, openReport, openAbout, showToast } = useApp();
   const { liked, likeCount, saved, toggleLike, toggleSave } = usePostEngagement(reel);
   const videoRef = useRef(null);
   const [muted, setMuted] = useState(true);
@@ -29,7 +29,7 @@ export function ReelCard({ reel, onHidden }) {
     { label: 'Report', danger: true, hidden: own, onClick: () => openReport({ type: 'post', id: reel.id, name: reel.name }, () => onHidden?.(reel)) },
     { label: 'Not interested', hidden: own, onClick: () => { onHidden?.(reel); showToast("We'll show fewer reels like this"); } },
     { label: 'Go to post', onClick: () => openPost(reel) },
-    { label: 'About this account', hidden: own, onClick: () => openProfile(reel.name) },
+    { label: 'About this account', hidden: own, onClick: () => openAbout(reel.name) },
     { label: 'Copy link', onClick: () => { navigator.clipboard?.writeText(postLink(reel.id)); showToast('Link copied'); } },
   ]);
   return <article className="reel-card">

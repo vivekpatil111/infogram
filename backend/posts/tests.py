@@ -222,3 +222,22 @@ class AuthorFollowStatusTests(InfogramAPITestCase):
         results = self.as_user(me).get("/api/v1/feed/").data["results"]
         status = {posts[p["id"]]: p["author"]["follow_status"] for p in results}
         self.assertEqual(status, {"me.user": "self", "friend": "following", "stranger": "none"})
+
+
+class LikersTests(InfogramAPITestCase):
+    def test_likers_lists_people_who_liked_newest_first_and_hides_blocked(self):
+        from safety.models import Block
+
+        author = self.make_user("author")
+        post = self.make_post(author)
+        fan, other, blocked = self.make_user("fan"), self.make_user("other"), self.make_user("blockedfan")
+        for person in (fan, other, blocked):
+            PostLike.objects.create(post=post, user=person)
+        viewer = self.make_user("viewer")
+        Block.objects.create(blocker=viewer, blocked=blocked)
+
+        response = self.as_user(viewer).get(f"/api/v1/posts/{post.id}/likers/")
+        self.assertEqual(response.status_code, 200)
+        names = [row["username"] for row in response.data["results"]]
+        self.assertEqual(sorted(names), ["fan", "other"])
+        self.assertIn("follow_status", response.data["results"][0])

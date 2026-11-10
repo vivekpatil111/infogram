@@ -1,16 +1,38 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send } from 'lucide-react';
-import { formatCount } from '../api';
+import { addPostComment, formatCount } from '../api';
 import { useApp } from '../context';
 import { Caption, MediaView } from './Media';
 import { usePostEngagement, usePostMenu } from './postActions';
 import { FollowButton } from './Sheets';
+import { EmojiButton, insertAtCaret } from './Emoji';
+
+const CAPTION_PREVIEW = 125;
 
 export function PostCard({ post, onHidden, onDeleted, onCommentAdded }) {
-  const { openProfile, openPost, openShare, navigate } = useApp();
+  const { currentUser, openProfile, openPost, openShare, openLikes, navigate, showToast } = useApp();
   const { liked, likeCount, saved, toggleLike, toggleSave } = usePostEngagement(post);
   const openMenu = usePostMenu();
   const showFollow = post.followStatus === 'none' || post.followStatus === 'requested';
+  const [expanded, setExpanded] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [posting, setPosting] = useState(false);
+  const [myComments, setMyComments] = useState([]);
+  const inputRef = useRef(null);
+  const longCaption = (post.caption || '').length > CAPTION_PREVIEW || (post.caption || '').split('\n').length > 2;
+  const caption = longCaption && !expanded ? `${post.caption.slice(0, CAPTION_PREVIEW).split('\n').slice(0, 2).join('\n').trimEnd()}…` : post.caption;
+  const submitComment = async (event) => {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!text || posting) return;
+    setPosting(true);
+    try {
+      const comment = await addPostComment(post.id, text);
+      setMyComments((current) => [...current, comment]);
+      setDraft('');
+      onCommentAdded?.(post.id);
+    } catch (error) { showToast(`Comment: ${error.message}`); } finally { setPosting(false); }
+  };
   return <article className="post">
     {post.isSuggested && <div className="post-suggested-label">Suggested for you</div>}
     <header className="post-header">
@@ -26,18 +48,25 @@ export function PostCard({ post, onHidden, onDeleted, onCommentAdded }) {
     <div className="post-actions">
       <div>
         <button onClick={() => toggleLike()} className={liked ? 'liked' : ''} aria-label={liked ? 'Unlike' : 'Like'}><Heart fill={liked ? 'currentColor' : 'none'}/></button>
-        <button onClick={() => openPost(post, { onCommentAdded })} aria-label="Comment"><MessageCircle/></button>
+        <button onClick={() => inputRef.current?.focus()} aria-label="Comment"><MessageCircle/></button>
         <button onClick={() => openShare(post)} aria-label="Share"><Send/></button>
       </div>
       <button onClick={toggleSave} className={saved ? 'saved' : ''} aria-label={saved ? 'Remove from saved' : 'Save'}><Bookmark fill={saved ? 'currentColor' : 'none'}/></button>
     </div>
     <div className="post-copy">
-      <b>{formatCount(likeCount)} {likeCount === 1 ? 'like' : 'likes'}</b>
-      {post.caption && <p><b role="button" tabIndex={0} onClick={() => openProfile(post.name)}>{post.name}</b> <Caption text={post.caption} onHashtag={(tag) => navigate('Explore', { topic: `#${tag}` })}/></p>}
+      {likeCount > 0 ? <button className="like-count" onClick={() => openLikes(post.id)}>{formatCount(likeCount)} {likeCount === 1 ? 'like' : 'likes'}</button> : <span className="like-count muted-text">Be the first to like this</span>}
+      {post.caption && <p className="post-caption"><b role="button" tabIndex={0} onClick={() => openProfile(post.name)}>{post.name}</b> <Caption text={caption} onHashtag={(tag) => navigate('Explore', { topic: `#${tag}` })}/>
+        {longCaption && !expanded && <button className="caption-more" onClick={() => setExpanded(true)}>more</button>}</p>}
       {post.commentCount > 0
         ? <button className="muted" onClick={() => openPost(post, { onCommentAdded })}>View {post.commentCount === 1 ? '1 comment' : `all ${post.commentCount} comments`}</button>
-        : <button className="muted" onClick={() => openPost(post, { onCommentAdded })}>Add a comment…</button>}
+        : null}
+      {myComments.map((comment) => <p key={comment.id} className="my-comment"><b>{currentUser?.username}</b> {comment.text}</p>)}
       <span className="timestamp">{post.time}</span>
+      <form className="inline-comment" onSubmit={submitComment}>
+        <input ref={inputRef} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add a comment…" aria-label="Add a comment" maxLength="2200"/>
+        {draft.trim() && <button className="inline-comment-post" disabled={posting}>{posting ? '…' : 'Post'}</button>}
+        <EmojiButton onPick={(emoji) => insertAtCaret(inputRef.current, draft, emoji, setDraft)}/>
+      </form>
     </div>
   </article>;
 }

@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Clapperboard, Compass, Heart, House, Instagram, LogOut, PlusSquare, Search, Send, UserRound } from 'lucide-react';
+import { Activity, Bookmark, BookOpenText, Clapperboard, Compass, Heart, House, LogOut, Menu, PlusSquare, Search, Send, Settings, UserRound } from 'lucide-react';
 import { SESSION_EXPIRED_EVENT, avatarOf, fetchCurrentUser, fetchUnreadCounts, hasAccessToken, logout, setUserFollow } from './api';
 import { AppContext } from './context';
 import { AuthScreen, ResetPasswordScreen } from './components/AuthScreens';
 import { CreateSheet } from './components/CreateSheet';
 import { PostModal } from './components/PostModal';
-import { ActionSheet, ReportSheet, ShareSheet } from './components/Sheets';
+import { AboutAccountModal, ActionSheet, LikesModal, ReportSheet, ShareSheet } from './components/Sheets';
 import { ActivityPage } from './pages/Activity';
 import { ExplorePage } from './pages/Explore';
 import { HomePage } from './pages/Home';
@@ -59,6 +59,9 @@ export default function App() {
   const [storiesVersion, setStoriesVersion] = useState(0);
   const [followOverrides, setFollowOverrides] = useState({});
   const [unread, setUnread] = useState({ notifications: 0, messages: 0 });
+  const [about, setAbout] = useState(null);
+  const [likesFor, setLikesFor] = useState(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [toast, setToast] = useState('');
   const toastTimer = useRef(null);
 
@@ -140,7 +143,9 @@ export default function App() {
     currentUser, setCurrentUser, showToast, navigate, openProfile, openPost,
     openShare: (post) => setShare(post),
     openReport: (target, onReported) => setReport({ target, onReported }),
-    openSheet: (actions) => setSheet(actions),
+    openSheet: (actions, title = null) => setSheet({ actions, title }),
+    openAbout: (username) => setAbout(username),
+    openLikes: (postId) => setLikesFor(postId),
     openCreate: (type = 'post') => setCreate(type),
     openSearch: () => setSearchOpen(true),
     openChat: (person) => { setChatTarget(person); navigate('Messages'); },
@@ -178,7 +183,7 @@ export default function App() {
   return <AppContext.Provider value={context}>
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate('Home'); }}><span className="brand-word">Infogram</span><Instagram className="brand-icon"/></a>
+        <a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate('Home'); }}><span className="brand-word">Infogram</span><BookOpenText className="brand-icon"/></a>
         <nav>
           {NAV.map(([Icon, label, action]) => <button key={label} className={`nav-item ${selected(label) ? 'selected' : ''}`} onClick={action}>
             <span className="nav-icon"><Icon/>{badge(label) > 0 && <i className="nav-badge">{Math.min(badge(label), 99)}</i>}</span><span>{label}</span>
@@ -187,7 +192,17 @@ export default function App() {
             <span className="nav-icon"><img className="nav-avatar" src={currentUser.avatar} alt=""/></span><span>Profile</span>
           </button>
         </nav>
-        <button className="nav-item more" onClick={logoutUser}><LogOut/><span>Log out</span></button>
+        <div className="more-wrap">
+          {moreOpen && <><div className="more-scrim" onClick={() => setMoreOpen(false)}/><div className="more-menu" role="menu">
+            {[[Settings, 'Settings', () => navigate('Profile', { username: currentUser.username, edit: true })],
+              [Activity, 'Your activity', () => navigate('Activity')],
+              [Bookmark, 'Saved', () => navigate('Profile', { username: currentUser.username, tab: 'saved' })],
+            ].map(([Icon, label, action]) => <button key={label} role="menuitem" onClick={() => { setMoreOpen(false); action(); }}><Icon/>{label}</button>)}
+            <hr/>
+            <button role="menuitem" onClick={logoutUser}><LogOut/>Log out</button>
+          </div></>}
+          <button className={`nav-item more ${moreOpen ? 'selected' : ''}`} onClick={() => setMoreOpen((open) => !open)} aria-expanded={moreOpen}><Menu/><span>More</span></button>
+        </div>
       </aside>
       <main className="main-content">
         <div className="mobile-header"><span className="brand-word">Infogram</span><div>
@@ -198,7 +213,7 @@ export default function App() {
         {page.name === 'Explore' && <ExplorePage topic={page.topic || ''}/>}
         {page.name === 'Reels' && <ReelsPage/>}
         {page.name === 'Messages' && <MessagesPage target={chatTarget} onTargetHandled={() => setChatTarget(null)} unreadMessages={unread.messages}/>}
-        {page.name === 'Profile' && <ProfilePage key={page.username} username={page.username}/>}
+        {page.name === 'Profile' && <ProfilePage key={`${page.username}-${page.tab || ''}-${page.edit ? 'edit' : ''}`} username={page.username} initialTab={page.tab} startEditing={page.edit}/>}
       </main>
       {page.name === 'Activity' && <ActivityPage/>}
       <nav className="mobile-nav">
@@ -213,7 +228,9 @@ export default function App() {
       {share && <ShareSheet post={share} onClose={() => setShare(null)}/>}
       {create && <CreateSheet initialType={create} onClose={() => setCreate(null)} onCreated={onCreated}/>}
       {report && <ReportSheet target={report.target} onClose={() => setReport(null)} onReported={(target) => { report.onReported?.(target); showToast("Thanks for reporting. We'll review it."); }}/>}
-      {sheet && <ActionSheet actions={sheet} onClose={() => setSheet(null)}/>}
+      {sheet && <ActionSheet actions={sheet.actions} title={sheet.title} onClose={() => setSheet(null)}/>}
+      {about && <AboutAccountModal username={about} onClose={() => setAbout(null)}/>}
+      {likesFor && <LikesModal postId={likesFor} onClose={() => setLikesFor(null)}/>}
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   </AppContext.Provider>;

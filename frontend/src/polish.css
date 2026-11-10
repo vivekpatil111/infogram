@@ -183,3 +183,77 @@ input, textarea { transition: border-color .18s ease, box-shadow .18s ease, back
 /* Reel author avatar: the generic reel-profile button style drew a white box around it. */
 .reel-profile .avatar-button { border: 0; padding: 0; margin: 0; background: none; border-radius: 50%; }
 .reel-profile .avatar-button img { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .85); }
+
+/* ---- sheets with a title (unfollow / delete confirmations) ---------------- */
+.sheet-title { display: grid; justify-items: center; gap: 8px; padding: 22px 24px 18px; border-bottom: 1px solid #efefef; text-align: center; font-size: 14px; }
+.sheet-title img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; }
+.sheet-title span { font-weight: 600; }
+.sheet-title small { color: #737373; font-size: 12px; line-height: 1.4; max-width: 300px; }
+
+/* ---- sidebar "More" menu --------------------------------------------------- */
+.more-wrap { margin-top: auto; position: relative; }
+.more-wrap .more { margin-top: 0; width: 100%; }
+.more-scrim { position: fixed; inset: 0; z-index: 5; }
+.more-menu {
+  position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 6; width: 266px; padding: 8px;
+  background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, .15);
+  display: flex; flex-direction: column; animation: pop-up .2s var(--ease-out); transform-origin: bottom left;
+}
+.more-menu button { display: flex; align-items: center; gap: 12px; border: 0; background: transparent; padding: 14px 12px; border-radius: 8px; font-size: 14px; text-align: left; }
+.more-menu button:hover { background: #f5f5f5; }
+.more-menu svg { width: 20px; height: 20px; stroke-width: 1.8; }
+.more-menu hr { border: 0; height: 6px; background: #f2f2f2; margin: 6px -8px; }
+
+/* ---- emoji popover --------------------------------------------------------- */
+.emoji-wrap { position: relative; display: inline-flex; flex: none; }
+.emoji-toggle { border: 0; background: transparent; padding: 4px; display: grid; place-items: center; color: #262626; }
+.emoji-toggle svg { width: 22px; height: 22px; stroke-width: 1.8; }
+.emoji-toggle:hover svg { opacity: .6; }
+.emoji-popover {
+  position: absolute; z-index: 30; width: 256px; padding: 10px; background: #fff; border-radius: 12px;
+  box-shadow: 0 6px 28px rgba(0, 0, 0, .18); display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px;
+  animation: pop-up .18s var(--ease-out);
+}
+.emoji-popover.up { bottom: calc(100% + 8px); right: -6px; }
+.emoji-popover button { border: 0; background: transparent; font-size: 22px; line-height: 1; padding: 6px 0; border-radius: 8px; }
+.emoji-popover button:hover { background: #f2f2f2; transform: scale(1.12); }
+.comment-form .emoji-wrap { margin-right: 4px; }
+.message-composer .emoji-wrap { margin: 0 2px; }
+
+/* ---- feed card: likes, caption, inline comment ----------------------------- */
+.like-count { border: 0; background: none; padding: 0; font-weight: 700; font-size: 14px; color: #262626; display: block; }
+span.like-count { font-weight: 500; font-size: 13px; }
+.caption-more { border: 0; background: none; padding: 0 0 0 2px; color: #737373; font-size: inherit; }
+.caption-more:hover { color: #262626; }
+.post-caption { white-space: pre-line; }
+.my-comment { margin: 4px 0; font-size: 14px; animation: rise-in .3s var(--ease-out); }
+.inline-comment { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid transparent; margin-top: 6px; }
+.inline-comment input { flex: 1; min-width: 0; border: 0; outline: 0; padding: 8px 0; font: inherit; font-size: 14px; background: transparent; }
+.inline-comment-post { border: 0; background: none; color: #0095f6; font-weight: 700; font-size: 14px; padding: 4px; }
+.inline-comment-post:hover { color: #00376b; }
+.inline-comment .emoji-toggle svg { width: 16px; height: 16px; color: #737373; }
+
+/* ---- carousel dots are buttons now ---------------------------------------- */
+.media-dots button { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .55); transition: background-color .2s ease, transform .2s ease; }
+.media-dots button.active { background: #fff; transform: scale(1.25); }
+
+/* ---- shared post card in DMs ---------------------------------------------- */
+.shared-post { display: flex; flex-direction: column; width: 220px; max-width: 100%; border: 0; padding: 0; background: #fff; color: #262626; border-radius: 14px; overflow: hidden; text-align: left; box-shadow: 0 0 0 1px #efefef; }
+.shared-post-head { display: flex; align-items: center; gap: 8px; padding: 9px 10px; font-size: 13px; }
+.shared-post-head img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+.shared-post-media, .shared-post video { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #efefef; }
+.shared-post small { padding: 8px 10px 10px; font-size: 12px; line-height: 1.35; color: #262626; }
+.shared-post-skeleton { width: 220px; height: 260px; border-radius: 0; }
+.shared-post.missing { padding: 12px; color: #737373; font-size: 13px; }
+
+/* ---- about this account --------------------------------------------------- */
+.about-body { display: grid; justify-items: center; gap: 10px; padding: 22px 24px 26px; text-align: center; }
+.about-body img { width: 78px; height: 78px; border-radius: 50%; object-fit: cover; }
+.about-body > b { font-size: 16px; }
+.about-body p { margin: 0; color: #737373; font-size: 13px; line-height: 1.45; max-width: 320px; }
+.about-body dl { width: 100%; margin: 6px 0; display: grid; gap: 2px; }
+.about-body dl div { display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #efefef; font-size: 14px; }
+.about-body dt { color: #737373; }
+.about-body dd { margin: 0; font-weight: 600; }
+.about-body > button { border: 0; background: #efefef; border-radius: 8px; padding: 9px 18px; font-weight: 600; font-size: 14px; }
+.about-body > button:hover { background: #dbdbdb; }

@@ -5,7 +5,7 @@ from rest_framework.pagination import CursorPagination
 from rest_framework.response import Response
 
 from notifications.services import create_notification, remove_notification
-from safety.querysets import not_blocked_q
+from safety.querysets import blocked_by_me, not_blocked_q
 
 from .models import Comment, PostLike, PostSave
 from .pagination import PostCursorPagination
@@ -59,6 +59,21 @@ class PostViewSet(viewsets.ModelViewSet):
         if deleted:
             remove_notification(recipient=post.author, actor=request.user, notification_type="like", post=post)
         return Response({"liked": False})
+
+    @action(detail=True, methods=["get"], url_path="likers")
+    def likers(self, request, pk=None):
+        """People who liked the post, most recent first ("Liked by" dialog)."""
+
+        from accounts.querysets import users_with_stats
+        from accounts.serializers import PublicUserSerializer
+        from accounts.views import UserCursorPagination
+
+        post = self.get_object()
+        people = users_with_stats(request.user).filter(post_likes__post=post).exclude(id__in=blocked_by_me(request.user))
+        paginator = UserCursorPagination()
+        page = paginator.paginate_queryset(people, request, view=self)
+        data = PublicUserSerializer(page, many=True, context={"request": request}).data
+        return paginator.get_paginated_response(data)
 
     @action(detail=True, methods=["post", "delete"], url_path="save")
     def save(self, request, pk=None):

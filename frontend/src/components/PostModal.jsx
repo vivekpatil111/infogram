@@ -6,6 +6,7 @@ import { Caption, MediaView } from './Media';
 import { usePostEngagement, usePostMenu } from './postActions';
 import { FollowButton } from './Sheets';
 import { ListSkeleton, Spinner } from './Skeleton';
+import { EmojiButton, insertAtCaret } from './Emoji';
 
 // Post detail: media, caption and the full comment thread.
 export function PostModal({ postOrId, onClose, onCommentAdded, onDeleted }) {
@@ -25,7 +26,7 @@ export function PostModal({ postOrId, onClose, onCommentAdded, onDeleted }) {
 }
 
 function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
-  const { currentUser, openProfile, openShare, openReport, navigate, showToast } = useApp();
+  const { currentUser, openProfile, openShare, openReport, openLikes, navigate, showToast } = useApp();
   const { liked, likeCount, saved, toggleLike, toggleSave } = usePostEngagement(post);
   const openMenu = usePostMenu();
   const [comments, setComments] = useState(null);
@@ -83,9 +84,9 @@ function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
         </div>
         <button onClick={toggleSave} className={saved ? 'saved' : ''} aria-label={saved ? 'Remove from saved' : 'Save'}><Bookmark fill={saved ? 'currentColor' : 'none'}/></button>
       </div>
-      <div className="post-copy"><b>{formatCount(likeCount)} {likeCount === 1 ? 'like' : 'likes'}</b><span className="timestamp">{post.time}</span></div>
+      <div className="post-copy">{likeCount > 0 ? <button className="like-count" onClick={() => openLikes(post.id)}>{formatCount(likeCount)} {likeCount === 1 ? 'like' : 'likes'}</button> : <span className="like-count muted-text">Be the first to like this</span>}<span className="timestamp">{post.time}</span></div>
       <form className="comment-form" onSubmit={submit}>
-        <img src={currentUser?.avatar || post.avatar} alt=""/>
+        <EmojiButton onPick={(emoji) => insertAtCaret(inputRef.current, text, emoji, setText)}/>
         <input ref={inputRef} value={text} onChange={(event) => setText(event.target.value)} placeholder="Add a comment…" aria-label="Add a comment" maxLength="2200"/>
         <button disabled={!text.trim() || busy}>{busy ? '…' : 'Post'}</button>
       </form>

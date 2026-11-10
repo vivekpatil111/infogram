@@ -31,8 +31,48 @@ copied anywhere. Infogram builds its own version of each concept.
 * **Private accounts.** Following a private account sends a request; content is limited to approved followers; going public approves pending requests (`accounts/services.py`).
 * **DMs.** A 1:1 message reuses the existing thread.
 
+## Feature-by-feature comparison (signed-in web app)
+
+Sources: the accessibility labels of the signed-in home and the ~80 UI module
+names listed in the capture's script inventory (`Polaris*`: dialogs, popovers,
+menus). Module names only say a surface exists. They don't show how it is built.
+
+| Instagram surface seen in the capture | Infogram | Where |
+| --- | --- | --- |
+| Home feed, "Suggested posts" after followed posts | ✅ | `posts/ranking.py`, `pages/Home.jsx` |
+| Story tray "Story by X, not seen", story viewer, viewer list (`StoriesV3ViewerListDialog`) | ✅ | `stories/`, `components/Stories.jsx` |
+| Carousel "Go to slide N", Next / Go back | ✅ clickable dots, arrows, touch swipe | `components/Media.jsx` |
+| Like / Comment / Share / Save, counts like "2.5K" | ✅ | `PostCard.jsx`, `formatCount` |
+| Liked-by list (`PostLikedByListDialogRoot`) | ✅ **new**: `GET /posts/{id}/likers/` + Likes dialog | `posts/views.py`, `LikesModal` |
+| Caption "… more" | ✅ **new** | `PostCard.jsx` |
+| Comment box under each feed post (`PostCommentInput`) | ✅ **new**: inline comment in the feed | `PostCard.jsx` |
+| Emoji picker (`EmojiPopover`) | ✅ **new**: comments (feed + post) and DMs | `components/Emoji.jsx` |
+| Post options popover (`PostOptionsPopover`) | ✅ | `postActions.js` |
+| About this account (`AboutThisAccountDialog`) | ✅ **new**: date joined, privacy, post count | `AboutAccountModal` |
+| Unfollow dialog (`UnfollowDialog`), Following actions (`FollowingActionsModal`) | ✅ **new**: confirm sheet; on profiles also mute posts/stories | `FollowButton` |
+| Profile options menus, own and other (`ProfileOwn/OtherOptionsContextMenu`) | ✅ | `pages/Profile.jsx` |
+| Follow lists (`FollowListModalWrapper`) | ✅ | `PeopleModal` |
+| Share sheet (`ShareSheetV3Root`) | ✅ | `ShareSheet` |
+| Post shared into a DM (`DirectMessagePostModal`) | ✅ **new**: preview card instead of a bare link | `pages/Messages.jsx` |
+| Sidebar "More" menu (`MoreContextMenu`) | ✅ **new**: Settings, Your activity, Saved, Log out | `App.jsx` |
+| Creation modal (`CreationModal`) | ✅ | `CreateSheet.jsx` |
+| Search subpanel and results, recent searches (`SearchSubpanel`) | ✅ | `pages/Search.jsx` |
+| Notifications badge (`NotificationsNavBadge`), "Messages – 3 new" | ✅ | `refreshUnread` |
+| Reels; comments open beside the reel (`ClipsDesktopCommentsPopover`) | ✅ reels; comments open the post view | `pages/Reels.jsx` |
+| Hashtag links (`#tag`), `explore/tags` | ✅ | `posts/hashtags.py` |
+| Relative times ("2 d", "1 w") linking to the post | ✅ | `relativeTime` |
+| `explore/locations` | ❌ no location field yet | |
+| "See Translation" | ❌ needs a translation service | |
+| Story stickers: mention, link, post (`StoriesV3*StickerPopover`) | ❌ | |
+| Profile with several links (`ProfilePageMultipleLinksModal`) | ❌ no links field yet | |
+| Two-factor and one-tap login (`TwoFactorLogin`, `OneTapLogin`) | ❌ | |
+| Report a problem (`BugReportModal`) | ❌ | |
+| Inbox notes (`InboxTrayItemPopover`) | ❌ | |
+| Keyboard shortcuts (`KeyCommandNub`), screen time, cookie consent, app upsells | ➖ not planned for the MVP | |
+| Threads, Meta AI and other Meta product links | ➖ not applicable | |
+
 ## Not built yet (next steps)
 
-Impression/"seen" tracking for
-"You're all caught up", blocking and muting, comment replies and likes, and HLS
-transcoding.
+Impression ("seen") tracking for "You're all caught up", comment replies and
+comment likes, locations, profile links, story stickers, two-factor login, and
+HLS transcoding. (Blocking and muting have shipped: `safety/`.)
