@@ -22,6 +22,13 @@ def _load_env_file(path):
 
 _load_env_file(BASE_DIR / ".env")
 
+# Values copied from .env into a hosting dashboard often keep their quotes
+# ("postgresql://..."), which dashboards store literally. Strip one matching pair.
+for _key, _value in list(os.environ.items()):
+    _trimmed = _value.strip()
+    if len(_trimmed) >= 2 and _trimmed[0] == _trimmed[-1] and _trimmed[0] in "'\"":
+        os.environ[_key] = _trimmed[1:-1].strip()
+
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
 if not SECRET_KEY:
