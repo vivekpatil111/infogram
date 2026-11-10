@@ -27,6 +27,11 @@ from .querysets import posts_for_user
 IN_NETWORK = 0
 SUGGESTED = 1
 
+UTILITY_POINTS = 300.0  # utility is ~0.1 for a fresh post, ~0.5+ for a very useful one
+UTILITY_EXPERT_IN_VERTICAL = 1.5  # verified expert posting in their own vertical
+UTILITY_EXPERT = 1.2  # verified expert posting elsewhere
+SEEN_PENALTY = -60.0
+
 
 def network_filter(user):
     """Posts authored by the user or by accounts they follow (no JOIN fan-out)."""
@@ -34,7 +39,7 @@ def network_filter(user):
     return Q(author=user) | Q(author_id__in=followed_ids(user))
 
 
-def ranked_posts_for_user(user, *, scope="all", media_type=None, topic=""):
+def ranked_posts_for_user(user, *, scope="all", media_type=None, topic="", vertical=""):
     """Return published posts annotated with `ranking_score` and `feed_tier`.
 
     scope:
@@ -54,6 +59,8 @@ def ranked_posts_for_user(user, *, scope="all", media_type=None, topic=""):
 
     if media_type:
         queryset = queryset.filter(media_type=media_type)
+    if vertical:
+        queryset = queryset.filter(vertical=vertical)
     if topic:
         tag = topic.lstrip("#").lower()
         queryset = queryset.filter(
@@ -65,11 +72,23 @@ def ranked_posts_for_user(user, *, scope="all", media_type=None, topic=""):
     )
     queryset = queryset.annotate(followed_author=followed_author)
 
-    engagement = (
-        Cast(F("like_count"), FloatField()) * 1.0
-        + Cast(F("comment_count"), FloatField()) * 3.0
-        + Cast(F("save_count"), FloatField()) * 5.0
+    likes = Cast(F("like_count"), FloatField())
+    comments = Cast(F("comment_count"), FloatField())
+    saves = Cast(F("save_count"), FloatField())
+    views = Cast(F("view_count"), FloatField())
+    engagement = likes * 1.0 + comments * 3.0 + saves * 5.0
+    # Utility Score (Infogram_Pivot.md): how often people who SAW a post found it
+    # worth keeping or discussing, weighted by expert verification. +1/+10 is
+    # smoothing so a new post with 1 view and 1 save doesn't top the feed.
+    expert_weight = Case(
+        When(Q(author__verified_at__isnull=False) & ~Q(vertical="") & Q(author__expert_vertical=F("vertical")), then=Value(UTILITY_EXPERT_IN_VERTICAL)),
+        When(author__verified_at__isnull=False, then=Value(UTILITY_EXPERT)),
+        default=Value(1.0),
+        output_field=FloatField(),
     )
+    utility = (saves * 1.0 + comments * 0.5 + likes * 0.25 + 1.0) / (views + 10.0) * expert_weight
+    # Seen posts sink below unseen ones in the same tier ("You're all caught up").
+    seen_penalty = Case(When(seen_by_me=True, then=Value(SEEN_PENALTY)), default=Value(0.0), output_field=FloatField())
     relationship = Case(
         When(author=user, then=Value(25.0)),
         When(followed_author=True, then=Value(30.0)),
@@ -82,7 +101,7 @@ def ranked_posts_for_user(user, *, scope="all", media_type=None, topic=""):
         default=Value(0.0),
         output_field=FloatField(),
     )
-    quality = Case(When(topic__gt="", then=Value(15.0)), default=Value(0.0), output_field=FloatField())
+    quality = Case(When(~Q(vertical="") | ~Q(topic=""), then=Value(15.0)), default=Value(0.0), output_field=FloatField())
     format_bonus = Case(
         When(media_type="video", then=Value(4.0)),
         When(media_type="carousel", then=Value(2.0)),
@@ -97,33 +116,34 @@ def ranked_posts_for_user(user, *, scope="all", media_type=None, topic=""):
     )
 
     return queryset.annotate(
-        ranking_score=engagement + relationship + freshness + quality + format_bonus,
+        utility_score=utility,
+        ranking_score=utility * UTILITY_POINTS + engagement * 0.3 + relationship + freshness + quality + format_bonus + seen_penalty,
         feed_tier=tier,
     )
 
 
-def home_feed(user, *, mode="for_you", topic=""):
+def home_feed(user, *, mode="for_you", topic="", vertical=""):
     """Following-first home feed: network posts, then suggested posts."""
 
     if mode == "following":
-        return ranked_posts_for_user(user, scope="network", topic=topic).order_by(
+        return ranked_posts_for_user(user, scope="network", topic=topic, vertical=vertical).order_by(
             "-ranking_score", "-created_at", "-id"
         )
-    return ranked_posts_for_user(user, scope="all", topic=topic).order_by(
+    return ranked_posts_for_user(user, scope="all", topic=topic, vertical=vertical).order_by(
         "feed_tier", "-ranking_score", "-created_at", "-id"
     )
 
 
-def reels_feed(user, *, mode="for_you", topic=""):
+def reels_feed(user, *, mode="for_you", topic="", vertical=""):
     """Reels recommend across the whole catalogue; following mode is network only."""
 
     scope = "network" if mode == "following" else "all"
-    return ranked_posts_for_user(user, scope=scope, media_type="video", topic=topic).order_by(
+    return ranked_posts_for_user(user, scope=scope, media_type="video", topic=topic, vertical=vertical).order_by(
         "-ranking_score", "-created_at", "-id"
     )
 
 
-def explore_feed(user, *, topic=""):
-    return ranked_posts_for_user(user, scope="discover", topic=topic).order_by(
+def explore_feed(user, *, topic="", vertical=""):
+    return ranked_posts_for_user(user, scope="discover", topic=topic, vertical=vertical).order_by(
         "-ranking_score", "-created_at", "-id"
     )

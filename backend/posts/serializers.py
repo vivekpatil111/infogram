@@ -2,14 +2,20 @@ from django.db import transaction
 from rest_framework import serializers
 
 from .hashtags import sync_hashtags
-from .models import Comment, Location, Post, PostMedia
+from .models import Comment, Location, Post, PostMedia, PostResource
 
 
 MAX_CAROUSEL_ITEMS = 10
 
 
 def author_summary(user):
-    return {"id": user.id, "username": user.username, "avatar_url": user.avatar_url}
+    return {
+        "id": user.id,
+        "username": user.username,
+        "avatar_url": user.avatar_url,
+        "is_verified": user.is_verified,
+        "expert_title": user.expert_title if user.is_verified else "",
+    }
 
 
 class PostMediaSerializer(serializers.ModelSerializer):
@@ -17,6 +23,43 @@ class PostMediaSerializer(serializers.ModelSerializer):
         model = PostMedia
         fields = ["position", "media_type", "media_url", "thumbnail_url"]
         read_only_fields = ["position"]
+
+
+MAX_RESOURCES = 5
+MAX_CHECKLIST_ITEMS = 20
+
+
+class PostResourceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PostResource
+        fields = ["id", "kind", "title", "url", "items", "open_count"]
+        read_only_fields = ["id", "open_count"]
+
+    def to_representation(self, resource):
+        data = super().to_representation(resource)
+        request = self.context.get("request")
+        # Open counts are the creator's stats, not public.
+        if request is None or resource.post.author_id != getattr(request.user, "id", None):
+            data.pop("open_count")
+        return data
+
+    def validate(self, attrs):
+        attrs["title"] = " ".join(attrs.get("title", "").split())
+        if not attrs["title"]:
+            raise serializers.ValidationError({"title": "Give the resource a title."})
+        kind = attrs["kind"]
+        if kind == PostResource.Kind.CHECKLIST:
+            items = [" ".join(str(item).split())[:120] for item in attrs.get("items") or []]
+            items = [item for item in items if item]
+            if not 1 <= len(items) <= MAX_CHECKLIST_ITEMS:
+                raise serializers.ValidationError({"items": f"A checklist needs 1 to {MAX_CHECKLIST_ITEMS} items."})
+            attrs["items"], attrs["url"] = items, ""
+        else:
+            url = attrs.get("url", "")
+            if not url.lower().startswith(("http://", "https://")):
+                raise serializers.ValidationError({"url": "Use a web link (https://...)."})
+            attrs["items"] = []
+        return attrs
 
 
 class LocationField(serializers.Field):
@@ -57,8 +100,11 @@ class PostSerializer(serializers.ModelSerializer):
     save_count = serializers.IntegerField(read_only=True, default=0)
     liked_by_me = serializers.BooleanField(read_only=True, default=False)
     saved_by_me = serializers.BooleanField(read_only=True, default=False)
+    seen_by_me = serializers.BooleanField(read_only=True, default=False)
     is_suggested = serializers.SerializerMethodField()
     location = LocationField(required=False, allow_null=True)
+    resources = PostResourceSerializer(many=True, required=False)
+    paths = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -70,7 +116,10 @@ class PostSerializer(serializers.ModelSerializer):
             "thumbnail_url",
             "media",
             "topic",
+            "vertical",
             "location",
+            "resources",
+            "paths",
             "caption",
             "hashtags",
             "is_published",
@@ -81,6 +130,7 @@ class PostSerializer(serializers.ModelSerializer):
             "save_count",
             "liked_by_me",
             "saved_by_me",
+            "seen_by_me",
             "is_suggested",
         ]
         read_only_fields = ["id", "author", "created_at", "updated_at"]
@@ -100,6 +150,14 @@ class PostSerializer(serializers.ModelSerializer):
             summary["follow_status"] = {"accepted": "following", "pending": "requested"}.get(status, "none")
         return summary
 
+    def get_paths(self, post):
+        """Learning Paths this post is a lesson in: "Part 3 of 10 · Startup Law"."""
+
+        items = getattr(post, "_prefetched_objects_cache", {}).get("path_items")
+        if items is None:
+            return []
+        return [{"id": item.path_id, "title": item.path.title, "position": item.position + 1, "total": item.path_total} for item in items]
+
     def get_is_suggested(self, post):
         return bool(getattr(post, "is_suggested", False))
 
@@ -114,6 +172,7 @@ class PostSerializer(serializers.ModelSerializer):
         user_id = getattr(getattr(request, "user", None), "id", None)
         urls = [attrs.get("media_url"), attrs.get("thumbnail_url")]
         urls += [u for slide in attrs.get("media_items") or [] for u in (slide.get("media_url"), slide.get("thumbnail_url"))]
+        urls += [resource.get("url") for resource in attrs.get("resources") or []]
         for url in filter(None, urls):
             key = uploaded_object_key(url)
             if key is None:
@@ -122,6 +181,11 @@ class PostSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"media_url": "You can only post media you uploaded."})
             if not object_exists(key):
                 raise serializers.ValidationError({"media_url": "The upload didn't finish. Please upload the file again."})
+
+    def validate_resources(self, value):
+        if len(value) > MAX_RESOURCES:
+            raise serializers.ValidationError(f"Add up to {MAX_RESOURCES} resources.")
+        return value
 
     def validate(self, attrs):
         attrs = self._validate_media_shape(attrs)
@@ -153,10 +217,18 @@ class PostSerializer(serializers.ModelSerializer):
                     )
         return attrs
 
+    @staticmethod
+    def _save_resources(post, resources):
+        post.resources.all().delete()
+        PostResource.objects.bulk_create([PostResource(post=post, position=i, **item) for i, item in enumerate(resources)])
+
     @transaction.atomic
     def create(self, validated_data):
         slides = validated_data.pop("media_items", None)
+        resources = validated_data.pop("resources", None)
         post = Post.objects.create(**validated_data)
+        if resources:
+            self._save_resources(post, resources)
         if slides:
             PostMedia.objects.bulk_create(
                 [PostMedia(post=post, position=index, **slide) for index, slide in enumerate(slides)]
@@ -167,7 +239,10 @@ class PostSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         slides = validated_data.pop("media_items", None)
+        resources = validated_data.pop("resources", None)
         post = super().update(instance, validated_data)
+        if resources is not None:
+            self._save_resources(post, resources)
         if slides is not None:
             post.media_items.all().delete()
             PostMedia.objects.bulk_create(

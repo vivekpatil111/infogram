@@ -21,9 +21,10 @@ class FeedView(APIView):
         if mode not in {"for_you", "following"}:
             return Response({"detail": "mode must be for_you or following."}, status=status.HTTP_400_BAD_REQUEST)
         topic = request.query_params.get("topic", "").strip()
+        vertical = request.query_params.get("vertical", "").strip()
         return paginate_ranked(
             request,
-            lambda: home_feed(request.user, mode=mode, topic=topic),
-            scope=f"home:{mode}",
+            lambda: home_feed(request.user, mode=mode, topic=topic, vertical=vertical),
+            scope=f"home:{mode}:{vertical}",
             serializer_class=PostSerializer,
         )

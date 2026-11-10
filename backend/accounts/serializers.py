@@ -73,10 +73,13 @@ def clean_links(value):
 class UserSerializer(serializers.ModelSerializer):
     """The signed-in user's own account (GET/PATCH /auth/me/)."""
 
+    is_verified = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = User
-        fields = ["id", "username", "email", "bio", "avatar_url", "is_private", "links", "date_joined"]
-        read_only_fields = ["id", "date_joined"]
+        fields = ["id", "username", "email", "bio", "avatar_url", "is_private", "links", "date_joined",
+                  "is_verified", "expert_vertical", "expert_title"]
+        read_only_fields = ["id", "date_joined", "is_verified", "expert_vertical", "expert_title"]
         extra_kwargs = {"bio": {"max_length": 500}}
 
     def update(self, instance, validated_data):
@@ -164,6 +167,7 @@ class LoginSerializer(TokenObtainPairSerializer):
 
 
 class PublicUserSerializer(serializers.ModelSerializer):
+    is_verified = serializers.BooleanField(read_only=True)
     followers_count = serializers.IntegerField(read_only=True, default=0)
     following_count = serializers.IntegerField(read_only=True, default=0)
     is_following = serializers.BooleanField(read_only=True, default=False)
@@ -197,6 +201,9 @@ class PublicUserSerializer(serializers.ModelSerializer):
             "posts_count",
             "date_joined",
             "links",
+            "is_verified",
+            "expert_vertical",
+            "expert_title",
         ]
 
     def _viewer_id(self):
@@ -218,3 +225,24 @@ class PublicUserSerializer(serializers.ModelSerializer):
         if getattr(user, "is_blocked", False):
             return False
         return not user.is_private or self.get_follow_status(user) in {"self", "following"}
+
+
+class ExpertApplicationSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import ExpertApplication
+
+        model = ExpertApplication
+        fields = ["id", "vertical", "title", "evidence_url", "note", "status", "created_at", "reviewed_at"]
+        read_only_fields = ["id", "status", "created_at", "reviewed_at"]
+
+    def validate_vertical(self, value):
+        from posts.verticals import VERTICAL_SLUGS
+
+        if value not in VERTICAL_SLUGS:
+            raise serializers.ValidationError("Pick one of the Knowledge Verticals.")
+        return value
+
+    def validate_evidence_url(self, value):
+        if not value.lower().startswith(("http://", "https://")):
+            raise serializers.ValidationError("Use a web link (https://...).")
+        return value

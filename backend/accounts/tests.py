@@ -153,3 +153,32 @@ class ProfileLinksTests(InfogramAPITestCase):
         other = self.make_user("visitor")
         profile = self.as_user(other).get("/api/v1/users/linker/profile/").data["profile"]
         self.assertEqual(len(profile["links"]), 2)
+
+
+class ExpertVerificationTests(InfogramAPITestCase):
+    def test_apply_once_then_staff_approval_shows_the_badge(self):
+        from accounts.models import ExpertApplication
+
+        me = self.make_user("ca.priya")
+        url = "/api/v1/auth/expert-application/"
+        self.assertIsNone(self.as_user(me).get(url).data["application"])
+        bad = self.as_user(me).post(url, {"vertical": "astrology", "title": "x", "evidence_url": "https://e.com"}, format="json")
+        self.assertEqual(bad.status_code, 400)
+        body = {"vertical": "finance", "title": "Chartered Accountant", "evidence_url": "https://icai.example/priya"}
+        self.assertEqual(self.as_user(me).post(url, body, format="json").status_code, 201)
+        self.assertEqual(self.as_user(me).post(url, body, format="json").status_code, 409)
+        # Users can't verify themselves through /auth/me/.
+        self.as_user(me).patch("/api/v1/auth/me/", {"is_verified": True, "expert_title": "Hacker"}, format="json")
+        me.refresh_from_db()
+        self.assertFalse(me.is_verified)
+
+        ExpertApplication.objects.get(user=me).approve()
+        me.refresh_from_db()  # force_authenticate keeps the object we pass in
+        status = self.as_user(me).get(url).data
+        self.assertEqual((status["is_verified"], status["expert_vertical"], status["application"]["status"]), (True, "finance", "approved"))
+        viewer = self.make_user("reader")
+        post = self.make_post(me)
+        author = self.as_user(viewer).get(f"/api/v1/posts/{post.id}/").data["author"]
+        self.assertEqual((author["is_verified"], author["expert_title"]), (True, "Chartered Accountant"))
+        profile = self.as_user(viewer).get("/api/v1/users/ca.priya/profile/").data["profile"]
+        self.assertTrue(profile["is_verified"])

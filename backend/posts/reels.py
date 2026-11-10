@@ -17,9 +17,10 @@ class ReelFeedView(APIView):
         if mode not in {"for_you", "following"}:
             return Response({"detail": "feed must be for_you or following."}, status=status.HTTP_400_BAD_REQUEST)
         topic = request.query_params.get("topic", "").strip()
+        vertical = request.query_params.get("vertical", "").strip()
         return paginate_ranked(
             request,
-            lambda: reels_feed(request.user, mode=mode, topic=topic),
-            scope=f"reels:{mode}",
+            lambda: reels_feed(request.user, mode=mode, topic=topic, vertical=vertical),
+            scope=f"reels:{mode}:{vertical}",
             serializer_class=PostSerializer,
         )

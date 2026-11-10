@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 
+from .verticals import VERTICAL_CHOICES
+
 
 class Hashtag(models.Model):
     """A `#tag` parsed from captions. Names are stored lowercase without '#'."""
@@ -54,6 +56,7 @@ class Post(models.Model):
     media_url = models.URLField(max_length=2048)
     thumbnail_url = models.URLField(max_length=2048, blank=True)
     topic = models.CharField(max_length=80, blank=True)
+    vertical = models.CharField(max_length=20, blank=True, choices=VERTICAL_CHOICES, db_index=True)
     location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, related_name="posts")
     caption = models.TextField(blank=True, max_length=2200)
     hashtags = models.ManyToManyField(Hashtag, blank=True, related_name="posts")
@@ -129,3 +132,37 @@ class CommentLike(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["comment", "user"], name="unique_comment_like")]
+
+
+class PostView(models.Model):
+    """First time a person actually saw a post (on screen long enough).
+    Feeds the Utility Score's denominator, "You're all caught up", and
+    Learning Path progress."""
+
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="views")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="post_views")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["post", "user"], name="unique_post_view")]
+        indexes = [models.Index(fields=["user", "post"])]
+
+
+class PostResource(models.Model):
+    """Resource Drawer ("Aha!" button): a link, a PDF or a checklist on a post."""
+
+    class Kind(models.TextChoices):
+        LINK = "link", "Link"
+        PDF = "pdf", "PDF guide"
+        CHECKLIST = "checklist", "Checklist"
+
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="resources")
+    position = models.PositiveSmallIntegerField(default=0)
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    title = models.CharField(max_length=80)
+    url = models.URLField(max_length=500, blank=True)
+    items = models.JSONField(default=list, blank=True)  # checklist lines
+    open_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["position", "id"]

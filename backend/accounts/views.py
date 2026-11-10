@@ -381,3 +381,32 @@ class FollowRequestViewSet(viewsets.GenericViewSet):
     def decline(self, request, username=None):
         services.decline_request(self.get_object())
         return Response({"declined": True})
+
+
+class ExpertApplicationView(generics.GenericAPIView):
+    """GET: your latest expert application (or null) plus your badge.
+    POST {vertical, title, evidence_url, note?}: apply. Staff approve in admin."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from .serializers import ExpertApplicationSerializer
+
+        latest = request.user.expert_applications.first()
+        return Response({
+            "is_verified": request.user.is_verified,
+            "expert_vertical": request.user.expert_vertical,
+            "expert_title": request.user.expert_title,
+            "application": ExpertApplicationSerializer(latest).data if latest else None,
+        })
+
+    def post(self, request):
+        from .models import ExpertApplication
+        from .serializers import ExpertApplicationSerializer
+
+        if request.user.expert_applications.filter(status=ExpertApplication.Status.PENDING).exists():
+            return Response({"detail": "Your application is already being reviewed."}, status=status.HTTP_409_CONFLICT)
+        serializer = ExpertApplicationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(user=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

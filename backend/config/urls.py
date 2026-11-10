@@ -26,7 +26,8 @@ from posts.feed import FeedView
 from posts.reels import ReelFeedView
 from notifications.views import NotificationViewSet
 from messaging.views import ConversationViewSet
-from discovery.views import ExploreView, LocationDetailView, LocationListView, SearchView, TopicView
+from paths.views import LearningPathViewSet
+from discovery.views import ExploreView, LocationDetailView, LocationListView, SearchView, TopicView, VerticalListView
 from stories.views import StoryViewSet
 from safety.views import BlockListViewSet, ReportViewSet
 
@@ -39,6 +40,7 @@ router.register("stories", StoryViewSet, basename="story")
 router.register("notifications", NotificationViewSet, basename="notification")
 router.register("conversations", ConversationViewSet, basename="conversation")
 router.register("reports", ReportViewSet, basename="report")
+router.register("paths", LearningPathViewSet, basename="paths")
 router.register("blocks", BlockListViewSet, basename="block")
 
 
@@ -53,6 +55,7 @@ urlpatterns = [
     path("api/v1/search/", SearchView.as_view(), name="search"),
     path("api/v1/explore/", ExploreView.as_view(), name="explore"),
     path("api/v1/topics/", TopicView.as_view(), name="topics"),
+    path("api/v1/verticals/", VerticalListView.as_view(), name="verticals"),
     path("api/v1/locations/", LocationListView.as_view(), name="locations"),
     path("api/v1/locations/<str:slug>/", LocationDetailView.as_view(), name="location-detail"),
 ]

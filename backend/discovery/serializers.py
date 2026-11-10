@@ -10,3 +10,4 @@ class SearchUserSerializer(serializers.Serializer):
     is_following = serializers.BooleanField()
     is_requested = serializers.BooleanField()
     is_private = serializers.BooleanField()
+    is_verified = serializers.BooleanField()

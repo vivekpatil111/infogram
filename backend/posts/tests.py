@@ -327,3 +327,72 @@ class LocationTests(InfogramAPITestCase):
         self.as_user(self.author).post("/api/v1/posts/", {"media_type": "image", "media_url": "https://cdn.example.com/1.jpg", "location": "Secret Cafe"}, format="json")
         page = self.as_user(self.viewer).get("/api/v1/locations/secret-cafe/")
         self.assertEqual(page.data["results"], [])
+
+
+class VerticalTests(InfogramAPITestCase):
+    def test_posts_take_a_vertical_and_feeds_filter_by_it(self):
+        author, viewer = self.make_user("teacher"), self.make_user("learner")
+        ok = self.as_user(author).post("/api/v1/posts/", {"media_type": "image", "media_url": "https://cdn.example.com/1.jpg", "vertical": "finance"}, format="json")
+        self.assertEqual(ok.data["vertical"], "finance")
+        self.as_user(author).post("/api/v1/posts/", {"media_type": "image", "media_url": "https://cdn.example.com/2.jpg", "vertical": "coding"}, format="json")
+        bad = self.as_user(author).post("/api/v1/posts/", {"media_type": "image", "media_url": "https://cdn.example.com/3.jpg", "vertical": "gossip"}, format="json")
+        self.assertEqual(bad.status_code, 400)
+        explore = self.as_user(viewer).get("/api/v1/explore/", {"vertical": "finance"}).data["results"]
+        self.assertEqual([p["vertical"] for p in explore], ["finance"])
+        verticals = {v["slug"]: v for v in self.as_user(viewer).get("/api/v1/verticals/").data["results"]}
+        self.assertEqual((verticals["finance"]["post_count"], verticals["coding"]["post_count"]), (1, 1))
+        self.assertEqual(verticals["finance"]["emoji"], "💰")
+
+
+class UtilityRankingTests(InfogramAPITestCase):
+    def _viewers(self, n, prefix):
+        return [self.make_user(f"{prefix}{i}") for i in range(n)]
+
+    def test_saves_per_view_beat_raw_saves_and_seen_posts_sink(self):
+        from posts.models import PostSave, PostView
+
+        author, me = self.make_user("creator"), self.make_user("me")
+        focused = self.make_post(author, caption="few views, often saved")
+        viral = self.make_post(author, caption="many views, same saves")
+        savers = self._viewers(3, "s")
+        lurkers = self._viewers(30, "l")
+        for person in savers:
+            PostSave.objects.create(post=focused, user=person)
+            PostSave.objects.create(post=viral, user=person)
+            PostView.objects.create(post=focused, user=person)
+            PostView.objects.create(post=viral, user=person)
+        PostView.objects.bulk_create([PostView(post=viral, user=person) for person in lurkers])
+
+        order = [p["id"] for p in self.as_user(me).get("/api/v1/explore/").data["results"]]
+        self.assertEqual(order, [focused.id, viral.id])
+
+        # Once I've seen the top post it drops below the one I haven't.
+        response = self.as_user(me).post("/api/v1/posts/seen/", {"ids": [focused.id, focused.id]}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.as_user(me).post("/api/v1/posts/seen/", {"ids": [focused.id]}, format="json")  # idempotent
+        self.assertEqual(PostView.objects.filter(post=focused, user=me).count(), 1)
+        rows = self.as_user(me).get("/api/v1/explore/").data["results"]
+        self.assertEqual([p["id"] for p in rows], [viral.id, focused.id])
+        self.assertTrue(next(p for p in rows if p["id"] == focused.id)["seen_by_me"])
+
+    def test_expert_in_their_vertical_gets_a_boost(self):
+        from django.utils import timezone
+
+        expert, regular, me = self.make_user("expert"), self.make_user("regular"), self.make_user("me2")
+        expert.verified_at, expert.expert_vertical, expert.expert_title = timezone.now(), "finance", "CA"
+        expert.save()
+        normal = self.make_post(regular, vertical="finance")
+        boosted = self.make_post(expert, vertical="finance")
+        order = [p["id"] for p in self.as_user(me).get("/api/v1/explore/").data["results"]]
+        self.assertEqual(order[0], boosted.id)
+        self.assertIn(normal.id, order)
+
+    def test_seen_ignores_posts_you_cannot_see(self):
+        from posts.models import PostView
+
+        private = self.make_user("hidden", is_private=True)
+        post = self.make_post(private)
+        me = self.make_user("me3")
+        self.assertEqual(self.as_user(me).post("/api/v1/posts/seen/", {"ids": [post.id]}, format="json").data, {"recorded": 0})
+        self.assertFalse(PostView.objects.exists())
+        self.assertEqual(self.as_user(me).post("/api/v1/posts/seen/", {"ids": "1"}, format="json").status_code, 400)

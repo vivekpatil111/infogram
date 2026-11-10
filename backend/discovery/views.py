@@ -95,10 +95,11 @@ class ExploreView(APIView):
 
     def get(self, request):
         topic = request.query_params.get("topic", "").strip()
+        vertical = request.query_params.get("vertical", "").strip()
         return paginate_ranked(
             request,
-            lambda: explore_feed(request.user, topic=topic),
-            scope="explore",
+            lambda: explore_feed(request.user, topic=topic, vertical=vertical),
+            scope=f"explore:{vertical}",
             serializer_class=PostSerializer,
             page_size=24,
         )
@@ -159,3 +160,25 @@ class LocationDetailView(APIView):
         response = paginator.get_paginated_response(PostSerializer(page, many=True, context={"request": request}).data)
         response.data["location"] = location_payload(location)
         return response
+
+
+class VerticalListView(APIView):
+    """GET /verticals/ - the Knowledge Verticals with post and expert counts."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.contrib.auth import get_user_model
+
+        from posts.verticals import VERTICALS
+
+        posts = dict(Post.objects.filter(is_published=True).exclude(vertical="").values_list("vertical").annotate(n=Count("id")))
+        experts = dict(
+            get_user_model().objects.filter(verified_at__isnull=False).exclude(expert_vertical="")
+            .values_list("expert_vertical").annotate(n=Count("id"))
+        )
+        return Response({"results": [
+            {"slug": slug, "name": name, "emoji": emoji, "description": description,
+             "post_count": posts.get(slug, 0), "expert_count": experts.get(slug, 0)}
+            for slug, name, emoji, description in VERTICALS
+        ]})

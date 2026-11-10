@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from notifications.services import create_notification, remove_notification
 from safety.querysets import blocked_by_me, not_blocked_q
 
-from .models import Comment, CommentLike, PostLike, PostSave
+from .models import Comment, CommentLike, PostLike, PostSave, PostView
 from .pagination import PostCursorPagination
 from .querysets import comments_with_stats, posts_for_user
 from .serializers import CommentSerializer, PostSerializer
@@ -34,7 +34,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         # Engagement endpoints are allowed on anyone's post.
-        if self.action in {"like", "save", "comments", "delete_comment", "like_comment", "likers"}:
+        if self.action in {"like", "save", "comments", "delete_comment", "like_comment", "likers", "seen", "open_resource"}:
             return [permissions.IsAuthenticated()]
         return super().get_permissions()
 
@@ -59,6 +59,29 @@ class PostViewSet(viewsets.ModelViewSet):
         if deleted:
             remove_notification(recipient=post.author, actor=request.user, notification_type="like", post=post)
         return Response({"liked": False})
+
+    @action(detail=True, methods=["post"], url_path=r"resources/(?P<resource_id>\d+)/open")
+    def open_resource(self, request, pk=None, resource_id=None):
+        """Count a Resource Drawer open (creator stats)."""
+
+        from django.db.models import F
+
+        post = self.get_object()
+        updated = post.resources.filter(pk=resource_id).update(open_count=F("open_count") + 1)
+        if not updated:
+            return Response({"detail": "Resource not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"opened": True})
+
+    @action(detail=False, methods=["post"], url_path="seen")
+    def seen(self, request):
+        """POST {ids: [...]} - posts that were on screen; first view only."""
+
+        ids = request.data.get("ids")
+        if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids) or len(ids) > 100:
+            return Response({"ids": ["Send up to 100 post ids."]}, status=status.HTTP_400_BAD_REQUEST)
+        visible = list(posts_for_user(request.user).filter(id__in=ids, is_published=True).values_list("id", flat=True))
+        PostView.objects.bulk_create([PostView(post_id=pid, user=request.user) for pid in visible], ignore_conflicts=True)
+        return Response({"recorded": len(visible)})
 
     @action(detail=True, methods=["get"], url_path="likers")
     def likers(self, request, pk=None):
