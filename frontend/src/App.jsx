@@ -9,6 +9,7 @@ import { AboutAccountModal, ActionSheet, LikesModal, ReportSheet, ShareSheet } f
 import { ActivityPage } from './pages/Activity';
 import { ExplorePage } from './pages/Explore';
 import { HomePage } from './pages/Home';
+import { LocationPage } from './pages/Location';
 import { MessagesPage } from './pages/Messages';
 import { ProfilePage } from './pages/Profile';
 import { ReelsPage } from './pages/Reels';
@@ -20,6 +21,8 @@ function parseLocation() {
   const params = new URLSearchParams(search);
   const post = pathname.match(/^\/post\/(\d+)\/?$/);
   if (post) return { page: { name: 'Home' }, postId: Number(post[1]) };
+  const place = pathname.match(/^\/location\/([^/]+)\/?$/);
+  if (place) return { page: { name: 'Location', slug: decodeURIComponent(place[1]) } };
   const user = pathname.match(/^\/u\/([^/]+)\/?$/);
   if (user) return { page: { name: 'Profile', username: decodeURIComponent(user[1]) } };
   const simple = { '/explore': 'Explore', '/reels': 'Reels', '/messages': 'Messages', '/activity': 'Activity' }[pathname.replace(/\/$/, '')];
@@ -29,6 +32,7 @@ function parseLocation() {
 
 function pathFor(page) {
   if (page.name === 'Profile') return `/u/${encodeURIComponent(page.username)}`;
+  if (page.name === 'Location') return `/location/${encodeURIComponent(page.slug)}`;
   if (page.name === 'Explore') return page.topic ? `/explore?topic=${encodeURIComponent(page.topic)}` : '/explore';
   return { Reels: '/reels', Messages: '/messages', Activity: '/activity' }[page.name] || '/';
 }
@@ -211,6 +215,7 @@ export default function App() {
         </div></div>
         {page.name === 'Home' && <HomePage createdPost={createdPost} storiesVersion={storiesVersion}/>}
         {page.name === 'Explore' && <ExplorePage topic={page.topic || ''}/>}
+        {page.name === 'Location' && <LocationPage key={page.slug} slug={page.slug}/>}
         {page.name === 'Reels' && <ReelsPage/>}
         {page.name === 'Messages' && <MessagesPage target={chatTarget} onTargetHandled={() => setChatTarget(null)} unreadMessages={unread.messages}/>}
         {page.name === 'Profile' && <ProfilePage key={`${page.username}-${page.tab || ''}-${page.edit ? 'edit' : ''}`} username={page.username} initialTab={page.tab} startEditing={page.edit}/>}

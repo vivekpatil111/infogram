@@ -66,6 +66,9 @@ Without storage credentials, presign falls back to an authenticated local upload
 - `POST /api/v1/posts/{id}/comments/` creates a comment; `{"text", "parent_id"}` makes it a reply. Threads are one level deep: replying to a reply attaches to its top-level comment. The replied-to author gets a `reply` notification.
 - `POST/DELETE /api/v1/posts/{id}/comments/{comment_id}/like/` likes or unlikes a comment (`comment_like` notification, removed on unlike).
 - `GET /api/v1/posts/{id}/likers/` lists who liked a post.
+- Posts take an optional `location` (a place name; `""` clears it) and return `location: {name, slug}` or `null`. Places are created on first use and shared by slug.
+- `GET /api/v1/locations/?q=` suggests places, most used first. `GET /api/v1/locations/{slug}/` returns `location: {name, slug, post_count}` plus that place's visible posts, newest first (cursor). `GET /search/` also returns `locations`.
+- `PATCH /api/v1/auth/me/` accepts `links`: up to 5 `{title?, url}`. Only http(s) URLs are allowed; a bare domain gets `https://`. Profiles return `links`.
 - `DELETE /api/v1/posts/{id}/comments/{comment_id}/` deletes a comment and its replies (its author or the post owner).
 
 Undoing an action (unlike, unsave, unfollow, deleting a comment or post) removes its notification.

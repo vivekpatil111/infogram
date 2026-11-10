@@ -1,8 +1,30 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bookmark, Camera, Clapperboard, Grid3x3, Heart, Layers, MessageCircle, MoreHorizontal, X } from 'lucide-react';
+import { Bookmark, Camera, Clapperboard, Grid3x3, Heart, Layers, Link2, MessageCircle, MoreHorizontal, Plus, Trash2, X } from 'lucide-react';
 import { avatarOf, changePassword, fetchBlockedAccounts, fetchFollowList, fetchProfile, formatCount, setUserBlocked, setUserMuted, updateProfile, uploadMedia } from '../api';
 import { useApp } from '../context';
 import { FollowButton, PeopleModal } from '../components/Sheets';
+
+const MAX_LINKS = 5;
+const linkHost = (url) => { try { return new URL(url).host.replace(/^www\./, ''); } catch { return url; } };
+const linkLabel = (link) => link.title || `${linkHost(link.url)}${(() => { try { const path = new URL(link.url).pathname; return path === '/' ? '' : path; } catch { return ''; } })()}`;
+
+// First link inline; "and N more" opens the full list.
+function ProfileLinks({ links, onMore }) {
+  return <div className="profile-links">
+    <Link2/>
+    <a href={links[0].url} target="_blank" rel="noopener noreferrer nofollow ugc">{linkLabel(links[0])}</a>
+    {links.length > 1 && <button onClick={onMore}>and {links.length - 1} more</button>}
+  </div>;
+}
+
+function LinksModal({ links, onClose }) {
+  return <div className="modal-backdrop new-message-backdrop" onClick={onClose}><section className="new-message-sheet" onClick={(event) => event.stopPropagation()}>
+    <header><b>Links</b><button onClick={onClose} aria-label="Close"><X/></button></header>
+    <div className="links-list">{links.map((link) => <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer nofollow ugc">
+      <span className="link-icon"><Link2/></span><span><b>{link.title || linkHost(link.url)}</b><small>{link.url}</small></span>
+    </a>)}</div>
+  </section></div>;
+}
 
 const TABS = [['posts', 'Posts', Grid3x3], ['reels', 'Reels', Clapperboard], ['saved', 'Saved', Bookmark]];
 
@@ -15,6 +37,7 @@ export function ProfilePage({ username, initialTab, startEditing = false }) {
   const [error, setError] = useState('');
   const [peopleList, setPeopleList] = useState(null);
   const [editing, setEditing] = useState(Boolean(startEditing && isOwn));
+  const [linksOpen, setLinksOpen] = useState(false);
   const isMe = isOwn;
 
   const load = () => {
@@ -81,6 +104,7 @@ export function ProfilePage({ username, initialTab, startEditing = false }) {
           <button onClick={() => openList('following')}><b>{formatCount(profile.following_count)}</b> following</button>
         </div>
         <p><b>{profile.username}</b>{profile.is_private && <span className="private-badge">Private</span>}{profile.follows_me && !isMe && <span className="private-badge">Follows you</span>}<br/>{profile.bio || (isMe ? <span className="muted-text">Add a bio so people know what you teach.</span> : null)}</p>
+        {profile.links?.length > 0 && <ProfileLinks links={profile.links} onMore={() => setLinksOpen(true)}/>}
       </div>
     </header>
     {profile.top_topics?.length > 0 && <div className="profile-topics">{profile.top_topics.map((topic) => <span key={topic}>{topic}</span>)}</div>}
@@ -101,6 +125,7 @@ export function ProfilePage({ username, initialTab, startEditing = false }) {
         </>}
     {peopleList && <PeopleModal title={peopleList.title} load={peopleList.load} onClose={() => setPeopleList(null)}/>}
     {editing && <ProfileEditModal onClose={() => setEditing(false)} onSaved={(user) => { setCurrentUser(user); setProfile((current) => ({ ...current, ...user })); }}/>}
+    {linksOpen && <LinksModal links={profile.links} onClose={() => setLinksOpen(false)}/>}
   </section>;
 }
 
@@ -109,6 +134,8 @@ function ProfileEditModal({ onClose, onSaved }) {
   const [bio, setBio] = useState(currentUser.bio || '');
   const [avatarUrl, setAvatarUrl] = useState(currentUser.avatar_url || '');
   const [isPrivate, setIsPrivate] = useState(Boolean(currentUser.is_private));
+  const [links, setLinks] = useState(() => (currentUser.links || []).map((link) => ({ ...link })));
+  const setLink = (index, field, value) => setLinks((current) => current.map((link, i) => (i === index ? { ...link, [field]: value } : link)));
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [passwords, setPasswords] = useState(null);
@@ -134,7 +161,8 @@ function ProfileEditModal({ onClose, onSaved }) {
         if (passwords.next !== passwords.confirm) throw new Error("New passwords don't match.");
         await changePassword(passwords.current, passwords.next);
       }
-      const updated = await updateProfile({ bio, avatar_url: avatarUrl, is_private: isPrivate });
+      const cleanLinks = links.filter((link) => link.url.trim()).map((link) => ({ title: link.title.trim(), url: link.url.trim() }));
+      const updated = await updateProfile({ bio, avatar_url: avatarUrl, is_private: isPrivate, links: cleanLinks });
       onSaved(updated);
       showToast(passwords?.next ? 'Profile and password updated' : 'Profile updated');
       onClose();
@@ -154,6 +182,14 @@ function ProfileEditModal({ onClose, onSaved }) {
         <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={choosePhoto}/>
       </div>
       <label>Bio<textarea value={bio} onChange={(event) => setBio(event.target.value)} rows="3" maxLength="500" placeholder="What do you teach or share?"/></label>
+      <fieldset className="links-editor"><legend>Links <small>{links.length}/{MAX_LINKS}</small></legend>
+        {links.map((link, index) => <div className="link-row" key={index}>
+          <input value={link.url} onChange={(event) => setLink(index, 'url', event.target.value)} placeholder="URL (e.g. github.com/you)" inputMode="url" maxLength="500" aria-label={`Link ${index + 1} URL`}/>
+          <input value={link.title} onChange={(event) => setLink(index, 'title', event.target.value)} placeholder="Title (optional)" maxLength="40" aria-label={`Link ${index + 1} title`}/>
+          <button type="button" onClick={() => setLinks((current) => current.filter((_, i) => i !== index))} aria-label={`Remove link ${index + 1}`}><Trash2/></button>
+        </div>)}
+        {links.length < MAX_LINKS && <button type="button" className="text-button add-link" onClick={() => setLinks((current) => [...current, { title: '', url: '' }])}><Plus/>Add link</button>}
+      </fieldset>
       <label className="private-toggle"><input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)}/><span><b>Private account</b><small>{isPrivate ? 'Only followers you approve can see your posts, reels and stories.' : 'Anyone can see your posts. Switching to public approves pending requests.'}</small></span></label>
       {passwords === null
         ? <button type="button" className="text-button" onClick={() => setPasswords({ current: '', next: '', confirm: '' })}>Change password</button>

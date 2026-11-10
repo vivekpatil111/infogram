@@ -39,7 +39,9 @@ export function PostCard({ post, onHidden, onDeleted, onCommentAdded }) {
       <button className="avatar-button" onClick={() => openProfile(post.name)}><img className="avatar" src={post.avatar} alt=""/></button>
       <div className="post-author">
         <b role="button" tabIndex={0} onClick={() => openProfile(post.name)}>{post.name}</b>
-        {post.place && <span role="button" tabIndex={0} onClick={() => navigate('Explore', { topic: post.place })}>{post.place}</span>}
+        {post.location
+          ? <span role="button" tabIndex={0} className="post-location" onClick={() => navigate('Location', { slug: post.location.slug })}>{post.location.name}</span>
+          : post.place && <span role="button" tabIndex={0} onClick={() => navigate('Explore', { topic: post.place })}>{post.place}</span>}
       </div>
       {showFollow && <FollowButton name={post.name} initialStatus={post.followStatus} className="follow-inline"/>}
       <button className="icon-button" onClick={() => openMenu(post, { onHidden, onDeleted })} aria-label="Post options"><MoreHorizontal/></button>

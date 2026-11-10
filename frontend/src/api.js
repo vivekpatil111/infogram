@@ -145,6 +145,7 @@ export function normalizePost(post) {
     avatar: avatarOf(post.author),
     followStatus: post.author?.follow_status || 'none',
     place: post.topic || '',
+    location: post.location || null, // { name, slug }
     image: post.media_url,
     poster: post.thumbnail_url || '',
     mediaType: post.media_type,
@@ -378,8 +379,20 @@ export async function searchContent(query) {
   return {
     users: (response.users || []).map(userRow),
     hashtags: response.hashtags || [],
+    locations: response.locations || [],
     posts: (response.posts || []).map(normalizePost),
   };
+}
+
+// Places to tag a post with (most used first), and a place's page.
+export async function fetchLocations(query = '') {
+  const response = await apiRequest(`/locations/?q=${encodeURIComponent(query)}`);
+  return response.results;
+}
+
+export async function fetchLocationPage(slug, next = null) {
+  const response = await apiRequest(next ? pathFromNext(next) : `/locations/${encodeURIComponent(slug)}/`);
+  return { location: response.location, items: response.results.map(normalizePost), next: response.next };
 }
 
 // ---------------------------------------------------------------------------

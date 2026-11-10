@@ -26,7 +26,7 @@ from posts.feed import FeedView
 from posts.reels import ReelFeedView
 from notifications.views import NotificationViewSet
 from messaging.views import ConversationViewSet
-from discovery.views import ExploreView, SearchView, TopicView
+from discovery.views import ExploreView, LocationDetailView, LocationListView, SearchView, TopicView
 from stories.views import StoryViewSet
 from safety.views import BlockListViewSet, ReportViewSet
 
@@ -53,6 +53,8 @@ urlpatterns = [
     path("api/v1/search/", SearchView.as_view(), name="search"),
     path("api/v1/explore/", ExploreView.as_view(), name="explore"),
     path("api/v1/topics/", TopicView.as_view(), name="topics"),
+    path("api/v1/locations/", LocationListView.as_view(), name="locations"),
+    path("api/v1/locations/<str:slug>/", LocationDetailView.as_view(), name="location-detail"),
 ]
 
 if settings.DEBUG:

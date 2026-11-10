@@ -292,3 +292,38 @@ class CommentThreadTests(InfogramAPITestCase):
         self.as_user(self.bob).post(self.url, {"text": "Child", "parent_id": top["id"]}, format="json")
         self.as_user(self.alice).delete(f"{self.url}{top['id']}/")
         self.assertFalse(Comment.objects.filter(post=self.post).exists())
+
+
+class LocationTests(InfogramAPITestCase):
+    def setUp(self):
+        super().setUp()
+        self.author = self.make_user("traveller")
+        self.viewer = self.make_user("viewer2")
+
+    def test_tagging_creates_and_reuses_a_location(self):
+        first = self.as_user(self.author).post("/api/v1/posts/", {"media_type": "image", "media_url": "https://cdn.example.com/1.jpg", "location": "  Pune,   India "}, format="json")
+        self.assertEqual(first.status_code, 201, first.data)
+        self.assertEqual(first.data["location"], {"name": "Pune, India", "slug": "pune-india"})
+        second = self.as_user(self.author).post("/api/v1/posts/", {"media_type": "image", "media_url": "https://cdn.example.com/2.jpg", "location": "pune india"}, format="json")
+        self.assertEqual(second.data["location"]["slug"], "pune-india")
+        cleared = self.as_user(self.author).patch(f"/api/v1/posts/{second.data['id']}/", {"location": ""}, format="json")
+        self.assertIsNone(cleared.data["location"])
+
+    def test_location_page_search_and_suggestions(self):
+        self.as_user(self.author).post("/api/v1/posts/", {"media_type": "image", "media_url": "https://cdn.example.com/1.jpg", "location": "Goa Beach"}, format="json")
+        page = self.as_user(self.viewer).get("/api/v1/locations/goa-beach/")
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(page.data["location"]["post_count"], 1)
+        self.assertEqual(len(page.data["results"]), 1)
+        self.assertEqual(self.as_user(self.viewer).get("/api/v1/locations/nowhere/").status_code, 404)
+        found = self.as_user(self.viewer).get("/api/v1/search/", {"q": "goa"}).data["locations"]
+        self.assertEqual(found, [{"name": "Goa Beach", "slug": "goa-beach", "post_count": 1}])
+        suggestions = self.as_user(self.viewer).get("/api/v1/locations/", {"q": "go"}).data["results"]
+        self.assertEqual(suggestions[0]["slug"], "goa-beach")
+
+    def test_private_authors_posts_stay_hidden_on_location_pages(self):
+        self.author.is_private = True
+        self.author.save()
+        self.as_user(self.author).post("/api/v1/posts/", {"media_type": "image", "media_url": "https://cdn.example.com/1.jpg", "location": "Secret Cafe"}, format="json")
+        page = self.as_user(self.viewer).get("/api/v1/locations/secret-cafe/")
+        self.assertEqual(page.data["results"], [])

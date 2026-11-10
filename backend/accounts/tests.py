@@ -140,3 +140,16 @@ class SuggestionTests(InfogramAPITestCase):
             self.make_post(me, topic=topic)
         profile = self.as_user(me).get("/api/v1/users/me.user/profile/").data["profile"]
         self.assertEqual(profile["top_topics"], ["Finance", "Coding"])
+
+
+class ProfileLinksTests(InfogramAPITestCase):
+    def test_links_are_normalised_validated_and_public(self):
+        me = self.make_user("linker")
+        response = self.as_user(me).patch("/api/v1/auth/me/", {"links": [{"title": " My   blog ", "url": "example.com/blog"}, {"url": "https://github.com/linker"}]}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["links"], [{"title": "My blog", "url": "https://example.com/blog"}, {"title": "", "url": "https://github.com/linker"}])
+        for bad in ([{"url": "javascript:alert(1)"}], [{"url": "notalink"}], [{"url": f"https://e{i}.com"} for i in range(6)]):
+            self.assertEqual(self.as_user(me).patch("/api/v1/auth/me/", {"links": bad}, format="json").status_code, 400, bad)
+        other = self.make_user("visitor")
+        profile = self.as_user(other).get("/api/v1/users/linker/profile/").data["profile"]
+        self.assertEqual(len(profile["links"]), 2)

@@ -15,6 +15,32 @@ class Hashtag(models.Model):
         return f"#{self.name}"
 
 
+class Location(models.Model):
+    """A named place a post can be tagged with. Created on first use from the
+    name the author types; posts sharing a slug share a location page."""
+
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=120, unique=True, allow_unicode=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def for_name(cls, name):
+        from django.utils.text import slugify
+
+        name = " ".join(name.split())[:100]
+        slug = slugify(name, allow_unicode=True)[:120]
+        if not slug:
+            return None
+        location, _ = cls.objects.get_or_create(slug=slug, defaults={"name": name})
+        return location
+
+
 class Post(models.Model):
     class MediaType(models.TextChoices):
         IMAGE = "image", "Image"
@@ -28,6 +54,7 @@ class Post(models.Model):
     media_url = models.URLField(max_length=2048)
     thumbnail_url = models.URLField(max_length=2048, blank=True)
     topic = models.CharField(max_length=80, blank=True)
+    location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, related_name="posts")
     caption = models.TextField(blank=True, max_length=2200)
     hashtags = models.ManyToManyField(Hashtag, blank=True, related_name="posts")
     is_published = models.BooleanField(default=True)

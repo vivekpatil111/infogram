@@ -20,7 +20,7 @@ def posts_for_user(user):
         .filter(visible_author_q(user))
         # Blocks hide content in both directions.
         .filter(not_blocked_q(user))
-        .select_related("author")
+        .select_related("author", "location")
         .prefetch_related("hashtags", Prefetch("media_items", queryset=PostMedia.objects.order_by("position")))
         .annotate(
             like_count=count_subquery(PostLike.objects.filter(post=OuterRef("pk")), "post"),

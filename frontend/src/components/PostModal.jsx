@@ -112,7 +112,10 @@ function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
     <div className="post-modal-side">
       <header className="post-header">
         <button className="avatar-button" onClick={() => goProfile(post.name)}><img className="avatar" src={post.avatar} alt=""/></button>
-        <div className="post-author"><b role="button" tabIndex={0} onClick={() => goProfile(post.name)}>{post.name}</b>{post.place && <span>{post.place}</span>}</div>
+        <div className="post-author"><b role="button" tabIndex={0} onClick={() => goProfile(post.name)}>{post.name}</b>
+          {post.location
+            ? <span role="button" tabIndex={0} className="post-location" onClick={() => { onClose(); navigate('Location', { slug: post.location.slug }); }}>{post.location.name}</span>
+            : post.place && <span>{post.place}</span>}</div>
         <FollowButton name={post.name} initialStatus={post.followStatus} className="follow-inline"/>
         <button className="icon-button" onClick={() => openMenu(post, { inModal: true, onDeleted: (deleted) => { onClose(); onDeleted?.(deleted); } })} aria-label="Post options"><MoreHorizontal/></button>
       </header>

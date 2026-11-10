@@ -5,7 +5,8 @@ from rest_framework.views import APIView
 
 from accounts.querysets import count_subquery, users_with_stats
 from posts.feed_snapshot import paginate_ranked
-from posts.models import Hashtag, Post
+from posts.models import Hashtag, Location, Post
+from posts.pagination import PostCursorPagination
 from posts.querysets import posts_for_user
 from posts.ranking import explore_feed
 from posts.serializers import PostSerializer
@@ -14,7 +15,7 @@ from safety.querysets import blocked_by_me
 from .serializers import SearchUserSerializer
 
 
-SEARCH_TYPES = {"all", "users", "posts", "hashtags"}
+SEARCH_TYPES = {"all", "users", "posts", "hashtags", "locations"}
 SEARCH_LIMIT = 20
 
 
@@ -37,7 +38,7 @@ class SearchView(APIView):
             return Response({"detail": "q must contain at least 2 characters."}, status=status.HTTP_400_BAD_REQUEST)
         is_tag_query = query.startswith("#")
 
-        payload = {"query": query, "users": [], "posts": [], "hashtags": []}
+        payload = {"query": query, "users": [], "posts": [], "hashtags": [], "locations": []}
         if result_type in {"all", "users"} and not is_tag_query:
             users = (
                 users_with_stats(request.user)
@@ -69,6 +70,10 @@ class SearchView(APIView):
                 .order_by("-post_count", "name")[:SEARCH_LIMIT]
             )
             payload["hashtags"] = [{"name": tag.name, "post_count": tag.post_count} for tag in tags]
+
+        if result_type in {"all", "locations"} and not is_tag_query:
+            places = locations_with_counts().filter(name__icontains=term).filter(post_count__gt=0)
+            payload["locations"] = [location_payload(place) for place in places.order_by("-post_count", "name")[:SEARCH_LIMIT]]
 
         if result_type in {"all", "posts"}:
             matches = Q(hashtags__name=term.lower())
@@ -113,3 +118,44 @@ class TopicView(APIView):
             .order_by("-post_count", "topic")[:50]
         )
         return Response({"topics": [row["topic"] for row in rows], "counts": rows})
+
+
+def locations_with_counts():
+    return Location.objects.annotate(
+        post_count=count_subquery(Post.objects.filter(location=OuterRef("pk"), is_published=True), "location")
+    )
+
+
+def location_payload(location):
+    return {"name": location.name, "slug": location.slug, "post_count": location.post_count}
+
+
+class LocationListView(APIView):
+    """GET /locations/?q= - places to tag a post with, most used first."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        places = locations_with_counts()
+        query = request.query_params.get("q", "").strip()
+        if query:
+            places = places.filter(name__icontains=query)
+        places = places.order_by("-post_count", "name")[:10]
+        return Response({"results": [location_payload(place) for place in places]})
+
+
+class LocationDetailView(APIView):
+    """GET /locations/{slug}/ - the place plus its posts, newest first (cursor)."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, slug):
+        location = locations_with_counts().filter(slug=slug).first()
+        if location is None:
+            return Response({"detail": "Location not found."}, status=status.HTTP_404_NOT_FOUND)
+        posts = posts_for_user(request.user).filter(location=location, is_published=True)
+        paginator = PostCursorPagination()
+        page = paginator.paginate_queryset(posts, request, view=self)
+        response = paginator.get_paginated_response(PostSerializer(page, many=True, context={"request": request}).data)
+        response.data["location"] = location_payload(location)
+        return response

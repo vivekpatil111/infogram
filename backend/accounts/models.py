@@ -9,6 +9,8 @@ class User(AbstractUser):
     # Private accounts: new followers must be approved, and posts/stories/
     # reels are visible only to the owner and approved followers.
     is_private = models.BooleanField(default=False)
+    # Up to MAX_PROFILE_LINKS [{"title": str, "url": "https://..."}], shown on the profile.
+    links = models.JSONField(default=list, blank=True)
 
     REQUIRED_FIELDS = ["email"]
 

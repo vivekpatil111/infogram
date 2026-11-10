@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from .hashtags import sync_hashtags
-from .models import Comment, Post, PostMedia
+from .models import Comment, Location, Post, PostMedia
 
 
 MAX_CAROUSEL_ITEMS = 10
@@ -17,6 +17,28 @@ class PostMediaSerializer(serializers.ModelSerializer):
         model = PostMedia
         fields = ["position", "media_type", "media_url", "thumbnail_url"]
         read_only_fields = ["position"]
+
+
+class LocationField(serializers.Field):
+    """Write a place name ("" clears it); read {name, slug} or null."""
+
+    def to_representation(self, location):
+        return {"name": location.name, "slug": location.slug} if location else None
+
+    def get_attribute(self, post):
+        return post.location
+
+    def to_internal_value(self, data):
+        if data in (None, ""):
+            return None
+        if not isinstance(data, str):
+            raise serializers.ValidationError("Send the place name as text.")
+        if len(data.strip()) > 100:
+            raise serializers.ValidationError("Keep the location under 100 characters.")
+        location = Location.for_name(data)
+        if location is None:
+            raise serializers.ValidationError("Enter a place name.")
+        return location
 
 
 class PostSerializer(serializers.ModelSerializer):
@@ -36,6 +58,7 @@ class PostSerializer(serializers.ModelSerializer):
     liked_by_me = serializers.BooleanField(read_only=True, default=False)
     saved_by_me = serializers.BooleanField(read_only=True, default=False)
     is_suggested = serializers.SerializerMethodField()
+    location = LocationField(required=False, allow_null=True)
 
     class Meta:
         model = Post
@@ -47,6 +70,7 @@ class PostSerializer(serializers.ModelSerializer):
             "thumbnail_url",
             "media",
             "topic",
+            "location",
             "caption",
             "hashtags",
             "is_published",

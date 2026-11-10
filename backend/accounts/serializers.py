@@ -43,12 +43,39 @@ def clean_email(value, *, instance=None):
     return email
 
 
+MAX_PROFILE_LINKS = 5
+
+
+def clean_links(value):
+    """[{title?, url}] -> normalised list; only http(s) URLs, at most 5."""
+
+    from urllib.parse import urlparse
+
+    if not isinstance(value, list):
+        raise serializers.ValidationError("Send a list of links.")
+    if len(value) > MAX_PROFILE_LINKS:
+        raise serializers.ValidationError(f"You can add up to {MAX_PROFILE_LINKS} links.")
+    cleaned = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise serializers.ValidationError("Each link needs a url.")
+        url = str(item.get("url", "")).strip()
+        title = " ".join(str(item.get("title", "")).split())[:40]
+        if url and "://" not in url:
+            url = f"https://{url}"
+        parts = urlparse(url)
+        if parts.scheme not in {"http", "https"} or not parts.netloc or "." not in parts.netloc or len(url) > 500:
+            raise serializers.ValidationError(f"\"{item.get('url', '')}\" isn't a valid web link.")
+        cleaned.append({"title": title, "url": url})
+    return cleaned
+
+
 class UserSerializer(serializers.ModelSerializer):
     """The signed-in user's own account (GET/PATCH /auth/me/)."""
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "bio", "avatar_url", "is_private", "date_joined"]
+        fields = ["id", "username", "email", "bio", "avatar_url", "is_private", "links", "date_joined"]
         read_only_fields = ["id", "date_joined"]
         extra_kwargs = {"bio": {"max_length": 500}}
 
@@ -66,6 +93,9 @@ class UserSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         return clean_email(value, instance=self.instance)
+
+    def validate_links(self, value):
+        return clean_links(value)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -166,6 +196,7 @@ class PublicUserSerializer(serializers.ModelSerializer):
             "stories_muted",
             "posts_count",
             "date_joined",
+            "links",
         ]
 
     def _viewer_id(self):

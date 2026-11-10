@@ -62,10 +62,10 @@ menus). Module names only say a surface exists. They don't show how it is built.
 | Reels; comments open beside the reel (`ClipsDesktopCommentsPopover`) | ✅ reels; comments open the post view | `pages/Reels.jsx` |
 | Hashtag links (`#tag`), `explore/tags` | ✅ | `posts/hashtags.py` |
 | Relative times ("2 d", "1 w") linking to the post | ✅ | `relativeTime` |
-| `explore/locations` | ❌ no location field yet | |
+| `explore/locations` | ✅ **new**: tag a place on a post, location page, places in search | `discovery/views.py`, `pages/Location.jsx` |
 | "See Translation" | ❌ needs a translation service | |
 | Story stickers: mention, link, post (`StoriesV3*StickerPopover`) | ❌ | |
-| Profile with several links (`ProfilePageMultipleLinksModal`) | ❌ no links field yet | |
+| Profile with several links (`ProfilePageMultipleLinksModal`) | ✅ **new**: up to 5 links, first inline plus "and N more" | `accounts/serializers.py`, `pages/Profile.jsx` |
 | Two-factor and one-tap login (`TwoFactorLogin`, `OneTapLogin`) | ❌ | |
 | Report a problem (`BugReportModal`) | ❌ | |
 | Inbox notes (`InboxTrayItemPopover`) | ❌ | |
@@ -74,5 +74,5 @@ menus). Module names only say a surface exists. They don't show how it is built.
 
 ## Not built yet (next steps)
 
-Impression ("seen") tracking for "You're all caught up", locations, profile links, story stickers, two-factor login, and
+Impression ("seen") tracking for "You're all caught up", story stickers, two-factor login, and
 HLS transcoding. (Blocking and muting have shipped: `safety/`.)

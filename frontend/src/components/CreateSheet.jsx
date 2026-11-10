@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
-import { createPost, createStory, normalizePost, uploadMedia } from '../api';
+import { MapPin, X } from 'lucide-react';
+import { createPost, createStory, fetchLocations, normalizePost, uploadMedia } from '../api';
+import { useDebounced } from '../hooks';
 import { useApp } from '../context';
 
 const MAX_BYTES = 100 * 1024 * 1024;
@@ -14,6 +15,16 @@ export function CreateSheet({ initialType = 'post', onClose, onCreated }) {
   const [files, setFiles] = useState([]);
   const [caption, setCaption] = useState('');
   const [topic, setTopic] = useState('');
+  const [place, setPlace] = useState('');
+  const [placeFocused, setPlaceFocused] = useState(false);
+  const [placeOptions, setPlaceOptions] = useState([]);
+  const placeQuery = useDebounced(place.trim());
+  useEffect(() => {
+    if (!placeFocused) return undefined;
+    let cancelled = false;
+    fetchLocations(placeQuery).then((rows) => { if (!cancelled) setPlaceOptions(rows); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [placeQuery, placeFocused]);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   useEffect(() => () => files.forEach((file) => URL.revokeObjectURL(file.preview)), [files]);
@@ -51,7 +62,7 @@ export function CreateSheet({ initialType = 'post', onClose, onCreated }) {
         const body = uploaded.length > 1
           ? { media: uploaded.map((item) => ({ media_type: item.media_type, media_url: item.media_url })) }
           : { media_type: uploaded[0].media_type, media_url: uploaded[0].media_url };
-        const created = await createPost({ ...body, topic: topic.trim(), caption: caption.trim() });
+        const created = await createPost({ ...body, topic: topic.trim(), caption: caption.trim(), ...(place.trim() ? { location: place.trim() } : {}) });
         showToast(type === 'reel' ? 'Reel shared' : 'Post shared');
         onCreated?.(type, normalizePost(created));
       }
@@ -82,6 +93,17 @@ export function CreateSheet({ initialType = 'post', onClose, onCreated }) {
         <small>{type === 'post' ? 'Add up to 10 to make a carousel' : type === 'story' ? 'Stories disappear after 24 hours' : 'Share a short, useful video'}</small></label>}
     <form className="create-form" onSubmit={publish}>
       {type !== 'story' && <input value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="Topic (e.g. Personal finance)" maxLength="80"/>}
+      {type !== 'story' && <div className="location-input">
+        <MapPin/>
+        <input value={place} onChange={(event) => setPlace(event.target.value)} onFocus={() => setPlaceFocused(true)} onBlur={() => window.setTimeout(() => setPlaceFocused(false), 150)}
+          placeholder="Add location" maxLength="100" aria-label="Add location"/>
+        {place && <button type="button" onClick={() => setPlace('')} aria-label="Remove location"><X/></button>}
+        {placeFocused && placeOptions.filter((option) => option.name.toLowerCase() !== place.trim().toLowerCase()).length > 0 && <div className="location-options">
+          {placeOptions.filter((option) => option.name.toLowerCase() !== place.trim().toLowerCase()).slice(0, 6).map((option) => <button type="button" key={option.slug} onMouseDown={(event) => event.preventDefault()} onClick={() => { setPlace(option.name); setPlaceFocused(false); }}>
+            <b>{option.name}</b><small>{option.post_count} {option.post_count === 1 ? 'post' : 'posts'}</small>
+          </button>)}
+        </div>}
+      </div>}
       <textarea value={caption} onChange={(event) => setCaption(event.target.value)} placeholder={type === 'story' ? 'Add a caption (optional)' : 'Write a caption… use #hashtags'} rows="3" maxLength={type === 'story' ? 180 : 2200}/>
       {error && <p className="auth-error" role="alert">{error}</p>}
       <div className="create-footer"><span>{progress || (type === 'story' ? 'Visible to your followers for 24h' : 'Informative content only')}</span><button disabled={!files.length || Boolean(progress)}>{progress ? 'Please wait…' : 'Share'}</button></div>

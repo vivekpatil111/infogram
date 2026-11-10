@@ -279,3 +279,47 @@ span.like-count { font-weight: 500; font-size: 13px; }
 .comment p span .comment-likes { display: inline; margin-top: 0; }
 .comment-form .emoji-toggle { color: #262626; }
 .post-modal-media .media-frame { background: #000; }
+
+/* ---- locations ------------------------------------------------------------- */
+.post-location { cursor: pointer; }
+.post-location:hover { text-decoration: underline; }
+.location-heading { display: flex; align-items: center; gap: 18px; margin: 4px 0 28px; }
+.location-heading h1 { font-size: 24px; margin: 0 0 4px; }
+.location-heading p { margin: 0; color: #737373; font-size: 14px; }
+.location-icon { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #e8f4ff, #f2ecff); color: #0095f6; flex: none; }
+.location-icon svg { width: 34px; height: 34px; }
+.location-input { position: relative; display: flex; align-items: center; gap: 8px; border: 1px solid #dbdbdb; border-radius: 8px; padding: 0 10px; background: #fafafa; }
+.location-input:focus-within { border-color: #a8a8a8; background: #fff; }
+.location-input > svg { width: 18px; height: 18px; color: #737373; flex: none; }
+.location-input input { flex: 1; min-width: 0; border: 0 !important; background: transparent !important; padding: 11px 0 !important; outline: 0; box-shadow: none !important; }
+.location-input > button { border: 0; background: none; padding: 2px; display: grid; place-items: center; color: #737373; }
+.location-input > button svg { width: 15px; height: 15px; }
+.location-options { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; background: #fff; border-radius: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, .15); overflow: hidden; animation: pop-up .15s var(--ease-out); }
+.location-options button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; border: 0; background: none; padding: 10px 14px; text-align: left; font-size: 14px; }
+.location-options button:hover { background: #f5f5f5; }
+.location-options small { color: #737373; font-size: 12px; }
+
+/* ---- profile links ---------------------------------------------------------- */
+.profile-links { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 14px; font-weight: 600; flex-wrap: wrap; }
+.profile-links svg { width: 15px; height: 15px; color: #00376b; transform: rotate(-45deg); }
+.profile-links a { color: #00376b; text-decoration: none; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-links a:hover { text-decoration: underline; }
+.profile-links button { border: 0; background: none; padding: 0; color: #00376b; font-weight: 600; font-size: 14px; }
+.links-list { display: flex; flex-direction: column; padding: 6px 0 10px; }
+.links-list a { display: flex; align-items: center; gap: 12px; padding: 10px 18px; color: #262626; text-decoration: none; }
+.links-list a:hover { background: #fafafa; }
+.links-list span:last-child { display: grid; gap: 2px; min-width: 0; }
+.links-list small { color: #737373; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-icon { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: #efefef; flex: none; }
+.link-icon svg { width: 18px; height: 18px; transform: rotate(-45deg); }
+.links-editor { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.links-editor legend { font-weight: 600; font-size: 14px; padding: 0; margin-bottom: 8px; }
+.links-editor legend small { color: #737373; font-weight: 400; margin-left: 6px; }
+.link-row { display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 6px; align-items: center; animation: rise-in .2s var(--ease-out); }
+.link-row input { min-width: 0; }
+.link-row button { border: 0; background: none; padding: 6px; color: #737373; display: grid; place-items: center; }
+.link-row button:hover { color: #ed4956; }
+.link-row button svg { width: 17px; height: 17px; }
+.add-link { display: inline-flex; align-items: center; gap: 6px; justify-self: start; }
+.add-link svg { width: 16px; height: 16px; }
+@media (max-width: 600px) { .link-row { grid-template-columns: 1fr auto; } .link-row input:nth-child(2) { grid-column: 1; } .link-row button { grid-row: 1 / span 2; grid-column: 2; } }
