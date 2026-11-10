@@ -232,14 +232,22 @@ export async function uploadMedia(file) {
     method: 'POST',
     body: JSON.stringify({ filename: file.name, content_type: file.type, size_bytes: file.size }),
   });
-  const uploadResponse = await fetch(presign.upload_url, {
-    method: 'PUT',
-    headers: {
-      ...presign.headers,
-      ...(presign.local_upload && getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
-    },
-    body: file,
-  });
+  let uploadResponse;
+  try {
+    uploadResponse = await fetch(presign.upload_url, {
+      method: 'PUT',
+      headers: {
+        ...presign.headers,
+        ...(presign.local_upload && getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
+      },
+      body: file,
+    });
+  } catch {
+    // The upload goes straight to object storage, not to our API, so a network
+    // failure here means this device can't reach the storage host (DNS, firewall,
+    // flaky connection) even though the API itself is fine.
+    throw new Error(`Couldn't reach media storage (${new URL(presign.upload_url).host}). Check your connection or DNS and try again.`);
+  }
   if (!uploadResponse.ok) {
     const payload = await uploadResponse.json().catch(() => ({}));
     throw new Error(payload.detail || 'Media upload failed. Please try again.');
