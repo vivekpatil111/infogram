@@ -12,6 +12,9 @@ class Story(models.Model):
     media_url = models.URLField(max_length=2048)
     thumbnail_url = models.URLField(max_length=2048, blank=True)
     caption = models.CharField(max_length=180, blank=True)
+    # Up to 3 stickers placed on the story: mention / link / poll, each with
+    # x, y as percentages of the frame. See StorySerializer.validate_stickers.
+    stickers = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
 
@@ -30,3 +33,13 @@ class StoryView(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["story", "user"], name="unique_story_view")]
+
+
+class StoryPollVote(models.Model):
+    story = models.ForeignKey(Story, on_delete=models.CASCADE, related_name="poll_votes")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="story_poll_votes")
+    option = models.PositiveSmallIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["story", "user"], name="unique_story_poll_vote")]

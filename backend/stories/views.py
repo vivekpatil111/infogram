@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.contrib.auth import get_user_model
 from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
@@ -10,11 +11,12 @@ from rest_framework.response import Response
 from accounts.querysets import followed_ids
 from safety.querysets import muted_stories, not_blocked_q
 
-from .models import Story, StoryView
+from .models import Story, StoryPollVote, StoryView
 from .serializers import StorySerializer
 
 
 STORY_LIFETIME = timedelta(hours=24)
+User = get_user_model()
 
 
 def visible_stories(user):
@@ -69,7 +71,7 @@ class StoryViewSet(viewsets.ModelViewSet):
             if not story.viewed_by_me and group["resume_index"] is None:
                 group["resume_index"] = len(group["stories"])
                 group["has_unseen"] = True
-            group["stories"].append(StorySerializer(story).data)
+            group["stories"].append(StorySerializer(story, context={"request": request}).data)
             group["latest_at"] = story.created_at
 
         ordered = sorted(
@@ -82,7 +84,25 @@ class StoryViewSet(viewsets.ModelViewSet):
         return Response({"results": ordered})
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user, expires_at=timezone.now() + STORY_LIFETIME)
+        from notifications.services import create_notification
+
+        story = serializer.save(author=self.request.user, expires_at=timezone.now() + STORY_LIFETIME)
+        mentioned = {sticker["user_id"] for sticker in story.stickers if sticker["type"] == "mention"}
+        for user in User.objects.filter(id__in=mentioned):
+            create_notification(recipient=user, actor=story.author, notification_type="story_mention")
+
+    @action(detail=True, methods=["post"], url_path="vote")
+    def vote(self, request, pk=None):
+        """POST {option: 0|1} - answer the story's poll once."""
+
+        story = self.get_object()
+        if not any(sticker["type"] == "poll" for sticker in story.stickers):
+            return Response({"detail": "This story has no poll."}, status=status.HTTP_400_BAD_REQUEST)
+        option = request.data.get("option")
+        if option not in (0, 1):
+            return Response({"option": ["Choose 0 or 1."]}, status=status.HTTP_400_BAD_REQUEST)
+        StoryPollVote.objects.get_or_create(story=story, user=request.user, defaults={"option": option})
+        return Response(StorySerializer(story, context={"request": request}).data)
 
     def perform_destroy(self, instance):
         if instance.author_id != self.request.user.id:

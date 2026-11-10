@@ -83,3 +83,24 @@ class Report(models.Model):
 
     def __str__(self):
         return f"{self.get_target_type_display()} report #{self.pk} ({self.reason})"
+
+
+class ProblemReport(models.Model):
+    """"Report a problem": something in the app is broken or confusing."""
+
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        RESOLVED = "resolved", "Resolved"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="problem_reports")
+    message = models.TextField(max_length=2000)
+    page = models.CharField(max_length=300, blank=True)
+    user_agent = models.CharField(max_length=300, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.OPEN, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.message[:60]}"

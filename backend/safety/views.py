@@ -3,6 +3,7 @@ from django.db.models import Q
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from posts.models import Comment
 from posts.querysets import posts_for_user
@@ -87,3 +88,24 @@ class ReportViewSet(viewsets.ViewSet):
             return ({"comment": comment}, comment.author) if comment else (None, None)
         story = visible_stories(user).filter(pk=pk).first()
         return ({"story": story}, story.author) if story else (None, None)
+
+
+class ProblemReportView(APIView):
+    """POST /support/problems/ {message, page?} - "Report a problem"."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_scope = "reports"
+
+    def post(self, request):
+        from .models import ProblemReport
+
+        message = str(request.data.get("message", "")).strip()
+        if len(message) < 5:
+            return Response({"message": ["Tell us a little more about what went wrong."]}, status=status.HTTP_400_BAD_REQUEST)
+        report = ProblemReport.objects.create(
+            user=request.user,
+            message=message[:2000],
+            page=str(request.data.get("page", ""))[:300],
+            user_agent=request.headers.get("User-Agent", "")[:300],
+        )
+        return Response({"id": report.id, "received": True}, status=status.HTTP_201_CREATED)

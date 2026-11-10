@@ -2,6 +2,8 @@ from django.urls import path
 
 from .views import (
     ExpertApplicationView,
+    TwoFactorLoginView,
+    TwoFactorView,
     LoginView,
     LogoutView,
     MeView,
@@ -23,4 +25,7 @@ urlpatterns = [
     path("password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
     path("password/change/", PasswordChangeView.as_view(), name="password-change"),
     path("expert-application/", ExpertApplicationView.as_view(), name="expert-application"),
+    path("2fa/", TwoFactorView.as_view(), name="two-factor"),
+    path("2fa/verify/", TwoFactorLoginView.as_view(), name="two-factor-verify"),
+    path("2fa/<str:step>/", TwoFactorView.as_view(), name="two-factor-step"),
 ]

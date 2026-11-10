@@ -410,3 +410,91 @@ class ExpertApplicationView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save(user=request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+def _tokens_for(user):
+    refresh = RefreshToken.for_user(user)
+    return {"refresh": str(refresh), "access": str(refresh.access_token)}
+
+
+class TwoFactorView(generics.GenericAPIView):
+    """Two-step login with an authenticator app.
+
+    GET    /auth/2fa/          {enabled, recovery_codes_left}
+    POST   /auth/2fa/setup/    new secret + otpauth:// URI (not enforced yet)
+    POST   /auth/2fa/enable/   {code}             -> turns it on, returns recovery codes once
+    POST   /auth/2fa/disable/  {password, code}   (code may be a recovery code)
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_scope = "auth"
+
+    def get(self, request):
+        return Response({"enabled": request.user.totp_enabled, "recovery_codes_left": len(request.user.recovery_codes)})
+
+    def post(self, request, step=None):
+        from . import totp
+
+        user = request.user
+        if step == "setup":
+            if user.totp_enabled:
+                return Response({"detail": "Two-step login is already on."}, status=status.HTTP_409_CONFLICT)
+            user.totp_secret = totp.generate_secret()
+            user.save(update_fields=["totp_secret"])
+            return Response({"secret": user.totp_secret, "otpauth_uri": totp.provisioning_uri(user.totp_secret, user.username)})
+        if step == "enable":
+            matched = totp.verify(user.totp_secret, request.data.get("code", ""), last_step=user.totp_last_step)
+            if user.totp_enabled or matched is None:
+                return Response({"code": ["That code didn't match. Check the time on your phone and try the newest code."]}, status=status.HTTP_400_BAD_REQUEST)
+            codes, hashes = totp.new_recovery_codes()
+            user.totp_enabled, user.totp_last_step, user.recovery_codes = True, matched, hashes
+            user.save(update_fields=["totp_enabled", "totp_last_step", "recovery_codes"])
+            return Response({"enabled": True, "recovery_codes": codes})
+        if step == "disable":
+            if not user.totp_enabled:
+                return Response({"enabled": False})
+            if not user.check_password(request.data.get("password", "")) or not _second_factor_ok(user, request.data.get("code", "")):
+                return Response({"detail": "Password or code is wrong."}, status=status.HTTP_400_BAD_REQUEST)
+            user.totp_enabled, user.totp_secret, user.recovery_codes, user.totp_last_step = False, "", [], -1
+            user.save(update_fields=["totp_enabled", "totp_secret", "recovery_codes", "totp_last_step"])
+            return Response({"enabled": False})
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+
+def _second_factor_ok(user, code):
+    """An authenticator code (not reused) or an unused recovery code (consumed)."""
+
+    from . import totp
+
+    matched = totp.verify(user.totp_secret, code, last_step=user.totp_last_step)
+    if matched is not None:
+        user.totp_last_step = matched
+        user.save(update_fields=["totp_last_step"])
+        return True
+    hashed = totp.hash_recovery_code(str(code))
+    if hashed in user.recovery_codes:
+        user.recovery_codes = [item for item in user.recovery_codes if item != hashed]
+        user.save(update_fields=["recovery_codes"])
+        return True
+    return False
+
+
+class TwoFactorLoginView(generics.GenericAPIView):
+    """POST /auth/2fa/verify/ {challenge, code} -> tokens, after the password step."""
+
+    permission_classes = [permissions.AllowAny]
+    throttle_scope = "auth"
+
+    def post(self, request):
+        from django.core import signing
+
+        from .serializers import TWO_FACTOR_CHALLENGE_SECONDS, TWO_FACTOR_SALT
+
+        try:
+            payload = signing.loads(request.data.get("challenge", ""), salt=TWO_FACTOR_SALT, max_age=TWO_FACTOR_CHALLENGE_SECONDS)
+        except signing.BadSignature:
+            return Response({"detail": "This sign-in attempt expired. Enter your password again."}, status=status.HTTP_400_BAD_REQUEST)
+        user = User.objects.filter(pk=payload.get("uid"), is_active=True, totp_enabled=True).first()
+        if user is None or not _second_factor_ok(user, request.data.get("code", "")):
+            return Response({"code": ["That code didn't work."]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(_tokens_for(user))

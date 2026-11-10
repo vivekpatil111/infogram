@@ -151,6 +151,10 @@ class PasswordChangeSerializer(serializers.Serializer):
     new_password = serializers.CharField(write_only=True, min_length=8)
 
 
+TWO_FACTOR_SALT = "infogram.two-factor-login"
+TWO_FACTOR_CHALLENGE_SECONDS = 300
+
+
 class LoginSerializer(TokenObtainPairSerializer):
     """Accept a username *or* email in the `username` field, case-insensitively."""
 
@@ -163,7 +167,13 @@ class LoginSerializer(TokenObtainPairSerializer):
         )
         if user is not None:
             attrs[self.username_field] = user.username
-        return super().validate(attrs)
+        data = super().validate(attrs)
+        if self.user.totp_enabled:
+            # Password was right; hold the tokens until the authenticator code.
+            from django.core import signing
+
+            return {"two_factor_required": True, "challenge": signing.dumps({"uid": self.user.id}, salt=TWO_FACTOR_SALT)}
+        return data
 
 
 class PublicUserSerializer(serializers.ModelSerializer):

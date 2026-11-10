@@ -182,3 +182,55 @@ class ExpertVerificationTests(InfogramAPITestCase):
         self.assertEqual((author["is_verified"], author["expert_title"]), (True, "Chartered Accountant"))
         profile = self.as_user(viewer).get("/api/v1/users/ca.priya/profile/").data["profile"]
         self.assertTrue(profile["is_verified"])
+
+
+class TwoFactorTests(InfogramAPITestCase):
+    def test_totp_matches_rfc6238_vector(self):
+        import base64
+
+        from accounts import totp
+
+        secret = base64.b32encode(b"12345678901234567890").decode()
+        # RFC 6238 Appendix B, SHA-1, T=59 -> 94287082 (8 digits); 6-digit tail is 287082.
+        self.assertEqual(totp.code_for(secret, now=59), "287082")
+
+    def test_setup_enable_login_with_code_recovery_and_disable(self):
+        from accounts import totp
+
+        me = self.make_user("secure.sam")
+        setup = self.as_user(me).post("/api/v1/auth/2fa/setup/").data
+        self.assertTrue(setup["otpauth_uri"].startswith("otpauth://totp/Infogram%3Asecure.sam?secret="))
+        self.assertEqual(self.as_user(me).post("/api/v1/auth/2fa/enable/", {"code": "000000"}, format="json").status_code, 400)
+        me.refresh_from_db()
+        enabled = self.as_user(me).post("/api/v1/auth/2fa/enable/", {"code": totp.code_for(setup["secret"], now=__import__("time").time() - 30)}, format="json")
+        self.assertEqual(enabled.status_code, 200, enabled.data)
+        recovery = enabled.data["recovery_codes"]
+        self.assertEqual(len(recovery), 8)
+
+        self.client.force_authenticate(None)
+        first = self.client.post("/api/v1/auth/login/", {"username": "secure.sam", "password": PASSWORD}, format="json").data
+        self.assertTrue(first["two_factor_required"])
+        self.assertNotIn("access", first)
+        # The code used to enable can't be replayed; the current one works.
+        code = totp.code_for(setup["secret"])
+        tokens = self.client.post("/api/v1/auth/2fa/verify/", {"challenge": first["challenge"], "code": code}, format="json")
+        self.assertEqual(tokens.status_code, 200, tokens.data)
+        self.assertIn("access", tokens.data)
+        replay = self.client.post("/api/v1/auth/2fa/verify/", {"challenge": first["challenge"], "code": code}, format="json")
+        self.assertEqual(replay.status_code, 400)
+
+        # A recovery code works once.
+        second = self.client.post("/api/v1/auth/login/", {"username": "secure.sam", "password": PASSWORD}, format="json").data
+        ok = self.client.post("/api/v1/auth/2fa/verify/", {"challenge": second["challenge"], "code": recovery[0].upper()}, format="json")
+        self.assertEqual(ok.status_code, 200)
+        again = self.client.post("/api/v1/auth/2fa/verify/", {"challenge": second["challenge"], "code": recovery[0]}, format="json")
+        self.assertEqual(again.status_code, 400)
+        bad = self.client.post("/api/v1/auth/2fa/verify/", {"challenge": "forged", "code": recovery[1]}, format="json")
+        self.assertEqual(bad.status_code, 400)
+
+        me.refresh_from_db()
+        off = self.as_user(me).post("/api/v1/auth/2fa/disable/", {"password": PASSWORD, "code": recovery[1]}, format="json")
+        self.assertEqual(off.data, {"enabled": False})
+        self.client.force_authenticate(None)
+        plain = self.client.post("/api/v1/auth/login/", {"username": "secure.sam", "password": PASSWORD}, format="json").data
+        self.assertIn("access", plain)

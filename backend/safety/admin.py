@@ -10,7 +10,7 @@ from django.db.models import Count, OuterRef, Q, Subquery
 from django.utils import timezone
 from django.utils.html import format_html
 
-from .models import Block, Mute, Report
+from .models import Block, Mute, ProblemReport, Report
 
 
 def _same_target_q(report):
@@ -96,3 +96,20 @@ class ReportAdmin(admin.ModelAdmin):
 
 
 admin.site.register([Block, Mute])
+
+
+@admin.register(ProblemReport)
+class ProblemReportAdmin(admin.ModelAdmin):
+    list_display = ("message_preview", "user", "page", "status", "created_at")
+    list_filter = ("status",)
+    search_fields = ("message", "user__username", "page")
+    readonly_fields = ("user", "message", "page", "user_agent", "created_at")
+    actions = ["mark_resolved"]
+
+    @admin.display(description="Problem")
+    def message_preview(self, report):
+        return report.message[:80]
+
+    @admin.action(description="Mark resolved")
+    def mark_resolved(self, request, queryset):
+        self.message_user(request, f"Resolved {queryset.update(status=ProblemReport.Status.RESOLVED)} report(s).")

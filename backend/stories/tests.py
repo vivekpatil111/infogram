@@ -64,3 +64,55 @@ class StoryTests(InfogramAPITestCase):
 
         viewers = self.as_user(self.me).get(f"/api/v1/stories/{story_id}/viewers/").data
         self.assertEqual([v["username"] for v in viewers["results"]], ["seen.friend"])
+
+
+class StoryStickerTests(InfogramAPITestCase):
+    def test_stickers_validate_mentions_notify_and_polls_count(self):
+        from accounts.models import Follow
+        from notifications.models import Notification
+
+        author, friend, voter = self.make_user("storyteller"), self.make_user("friend"), self.make_user("voter")
+        Follow.objects.create(follower=voter, following=author)
+        body = {"media_type": "image", "media_url": "https://cdn.example.com/s.jpg", "stickers": [
+            {"type": "mention", "username": "@Friend", "x": 20, "y": 30},
+            {"type": "link", "url": "example.com/guide", "label": "Read the guide", "x": 50, "y": 80},
+            {"type": "poll", "question": "Did this help?", "options": ["Yes", "Not yet"], "x": 140, "y": -5},
+        ]}
+        created = self.as_user(author).post("/api/v1/stories/", body, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        stickers = created.data["stickers"]
+        self.assertEqual(stickers[0]["username"], "friend")
+        self.assertEqual(stickers[1]["url"], "https://example.com/guide")
+        self.assertEqual((stickers[2]["x"], stickers[2]["y"]), (100.0, 0.0))
+        self.assertTrue(Notification.objects.filter(recipient=friend, notification_type="story_mention").exists())
+
+        story_id = created.data["id"]
+        tray = self.as_user(voter).get("/api/v1/stories/").data["results"][0]["stories"][0]
+        self.assertNotIn("counts", tray["stickers"][2])  # results hidden until you vote
+        voted = self.as_user(voter).post(f"/api/v1/stories/{story_id}/vote/", {"option": 1}, format="json").data
+        poll = voted["stickers"][2]
+        self.assertEqual((poll["my_vote"], poll["counts"]), (1, [0, 1]))
+        self.as_user(voter).post(f"/api/v1/stories/{story_id}/vote/", {"option": 0}, format="json")  # can't change
+        mine = self.as_user(author).get("/api/v1/stories/").data["results"][0]["stories"][0]["stickers"][2]
+        self.assertEqual(mine["counts"], [0, 1])
+
+        bad = [
+            [{"type": "mention", "username": "nobody_here"}],
+            [{"type": "link", "url": "javascript:alert(1)"}],
+            [{"type": "poll", "question": "Q", "options": ["only one"]}],
+            [{"type": "poll", "question": "A", "options": ["1", "2"]}, {"type": "poll", "question": "B", "options": ["1", "2"]}],
+            [{"type": "link", "url": "e.com"}] * 4,
+        ]
+        for stickers in bad:
+            self.assertEqual(self.as_user(author).post("/api/v1/stories/", {**body, "stickers": stickers}, format="json").status_code, 400, stickers)
+
+
+class ProblemReportTests(InfogramAPITestCase):
+    def test_problem_reports_are_stored(self):
+        from safety.models import ProblemReport
+
+        me = self.make_user("reporter")
+        self.assertEqual(self.as_user(me).post("/api/v1/support/problems/", {"message": "bad"}, format="json").status_code, 400)
+        ok = self.as_user(me).post("/api/v1/support/problems/", {"message": "Upload button does nothing", "page": "/explore"}, format="json")
+        self.assertEqual(ok.status_code, 201)
+        self.assertEqual(ProblemReport.objects.get().page, "/explore")

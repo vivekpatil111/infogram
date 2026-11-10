@@ -48,4 +48,5 @@ class NotificationSerializer(serializers.ModelSerializer):
             Notification.Type.FOLLOW_ACCEPT: "accepted your follow request.",
             Notification.Type.COMMENT_LIKE: "liked your comment.",
             Notification.Type.REPLY: "replied to your comment.",
+            Notification.Type.STORY_MENTION: "mentioned you in their story.",
         }[notification.notification_type]

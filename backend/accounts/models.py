@@ -15,6 +15,12 @@ class User(AbstractUser):
     expert_vertical = models.CharField(max_length=20, blank=True)
     expert_title = models.CharField(max_length=80, blank=True)
     verified_at = models.DateTimeField(null=True, blank=True)
+    # Two-step login (authenticator app). The secret is set during setup and
+    # only enforced once totp_enabled is true. Recovery codes are SHA-256 hashes.
+    totp_secret = models.CharField(max_length=64, blank=True)
+    totp_enabled = models.BooleanField(default=False)
+    totp_last_step = models.BigIntegerField(default=-1)
+    recovery_codes = models.JSONField(default=list, blank=True)
 
     @property
     def is_verified(self):
