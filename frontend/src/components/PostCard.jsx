@@ -6,6 +6,7 @@ import { Caption, MediaView } from './Media';
 import { usePostEngagement, usePostMenu } from './postActions';
 import { FollowButton } from './Sheets';
 import { EmojiButton, insertAtCaret } from './Emoji';
+import { TipButton } from './Tips';
 import { PathChip, ResourceButton, VerifiedBadge, VerticalPill, useSeen } from './Knowledge';
 
 const CAPTION_PREVIEW = 125;
@@ -55,6 +56,7 @@ export function PostCard({ post, onHidden, onDeleted, onCommentAdded }) {
         <button onClick={() => toggleLike()} className={liked ? 'liked' : ''} aria-label={liked ? 'Unlike' : 'Like'}><Heart fill={liked ? 'currentColor' : 'none'}/></button>
         <button onClick={() => inputRef.current?.focus()} aria-label="Comment"><MessageCircle/></button>
         <button onClick={() => openShare(post)} aria-label="Share"><Send/></button>
+        <TipButton post={post}/>
       </div>
       <div className="post-actions-right">
         <ResourceButton post={post}/>

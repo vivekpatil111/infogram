@@ -578,3 +578,45 @@ html[data-theme="dark"] { --sk-base: #1f1f1f; --sk-shine: #2a2a2a; }
 .create-preview.story-compose > button { background: #efefef; color: #262626; }
 .create-preview.story-compose .sticker-form { width: 100%; }
 .sticker-frame .poll-card { width: 180px; padding: 10px 8px 8px; } .sticker-frame .poll-options span { padding: 7px 10px; font-size: 13px; }
+
+/* =====================  Tips  ===================== */
+.tip-button svg { color: #262626; }
+.post-actions .tip-button:hover svg { color: #16a34a; opacity: 1; }
+.tip-sheet { background: #fff; width: min(100%, 420px); margin: auto; border-radius: 18px; padding: 18px; display: grid; gap: 12px; animation: pop-up .26s var(--ease-out); }
+.tip-sheet header { display: flex; align-items: center; gap: 12px; }
+.tip-sheet header img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
+.tip-sheet header div { flex: 1; display: grid; gap: 2px; }
+.tip-sheet header small { color: #737373; font-size: 12px; }
+.tip-sheet header button { border: 0; background: none; padding: 4px; display: grid; place-items: center; }
+.tip-amounts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tip-amounts button { border: 1.5px solid #dbdbdb; background: #fff; border-radius: 12px; padding: 12px 0; font-weight: 800; font-size: 16px; }
+.tip-amounts button.active { border-color: #7c3aed; background: #f5f0ff; color: #6d28d9; }
+.tip-custom { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: #555; }
+.tip-custom span { display: flex; align-items: center; gap: 4px; border: 1px solid #dbdbdb; border-radius: 10px; padding: 0 10px; font-weight: 700; }
+.tip-custom input { width: 90px; border: 0; outline: 0; padding: 9px 0; font: inherit; background: transparent; }
+.tip-sheet textarea { border: 1px solid #dbdbdb; border-radius: 10px; padding: 10px; font: inherit; font-size: 14px; resize: none; background: #fafafa; }
+.tip-pay { border: 0; border-radius: 12px; padding: 13px; font-weight: 800; font-size: 15px; color: #fff; background: linear-gradient(90deg, #7c3aed, #2563eb); }
+.tip-pay:disabled { opacity: .5; }
+.tip-note { margin: 0; color: #8e8e8e; font-size: 11px; text-align: center; }
+.tips-tabs { display: flex; gap: 6px; padding: 10px 16px 0; }
+.tips-tabs button { flex: 1; border: 0; background: #f2f2f2; border-radius: 999px; padding: 8px; font-weight: 700; font-size: 13px; }
+.tips-tabs button.active { background: #262626; color: #fff; }
+.tips-total { display: grid; justify-items: center; gap: 2px; padding: 18px 0 8px; }
+.tips-total span { font-size: 30px; font-weight: 800; background: linear-gradient(90deg, #7c3aed, #2563eb); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.tips-total small { color: #737373; font-size: 12px; }
+.tips-list { display: grid; padding: 4px 8px 12px; max-height: 50vh; overflow: auto; }
+.tip-row { display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: 10px; }
+.tip-row img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.tip-row span { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.tip-row small { color: #737373; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tip-row em { font-style: normal; font-weight: 800; color: #16a34a; }
+html[data-theme="dark"] .tip-sheet { background: #1c1c1c; box-shadow: 0 0 0 1px #2e2e2e; }
+html[data-theme="dark"] .tip-amounts button.active { background: #241a3a; color: #c4b5fd; }
+
+/* People lists, likes, about, links, tips: a centered dialog on desktop (full screen on phones). */
+@media (min-width: 601px) {
+  .new-message-backdrop { align-items: center; justify-content: center; padding: 24px; }
+  .new-message-sheet { height: auto; max-height: min(640px, 86vh); border-radius: 14px; box-shadow: 0 12px 48px rgba(0, 0, 0, .25); overflow: hidden; animation: pop-up .24s var(--ease-out); width: min(100%, 440px); }
+  .new-message-sheet header { position: relative; }
+  .new-message-results, .tips-list, .links-list { overflow: auto; }
+}

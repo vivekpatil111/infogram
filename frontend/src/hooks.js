@@ -117,3 +117,67 @@ export function useInstallPrompt() {
   };
   return [available, install];
 }
+
+// Adaptive streaming: play the HLS playlist when there is one (native on
+// Safari/iOS, hls.js elsewhere, loaded only when needed), else the MP4.
+export function useVideoSource(videoRef, { hls, mp4 }) {
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return undefined;
+    let player = null;
+    let cancelled = false;
+    if (!hls || video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = hls || mp4;
+      return undefined;
+    }
+    import('hls.js').then(({ default: Hls }) => {
+      if (cancelled) return;
+      if (!Hls.isSupported()) { video.src = mp4; return; }
+      player = new Hls({ capLevelToPlayerSize: true, maxBufferLength: 20 });
+      player.on(Hls.Events.ERROR, (_, data) => { if (data.fatal) { player.destroy(); player = null; video.src = mp4; } });
+      player.loadSource(hls);
+      player.attachMedia(video);
+    }).catch(() => { if (!cancelled) video.src = mp4; });
+    return () => { cancelled = true; player?.destroy(); };
+  }, [videoRef, hls, mp4]);
+}
+
+// Push notifications on this device.
+function base64UrlToBytes(value) {
+  const padded = (value + '='.repeat((4 - (value.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
+}
+export function usePush(api) {
+  const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const [state, setState] = useState({ ready: false, enabled: false, subscribed: false, publicKey: '' });
+  useEffect(() => {
+    if (!supported) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const config = await api.fetchPushConfig();
+        const registration = await navigator.serviceWorker.getRegistration();
+        const subscription = await registration?.pushManager.getSubscription();
+        if (!cancelled) setState({ ready: true, enabled: config.enabled, subscribed: Boolean(subscription) && Notification.permission === 'granted', publicKey: config.public_key });
+      } catch { if (!cancelled) setState((current) => ({ ...current, ready: true })); }
+    })();
+    return () => { cancelled = true; };
+  }, [supported]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggle = async () => {
+    const registration = (await navigator.serviceWorker.getRegistration()) || (await navigator.serviceWorker.register('/sw.js'));
+    await navigator.serviceWorker.ready;
+    if (state.subscribed) {
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) { await api.deletePushSubscription(subscription.endpoint).catch(() => {}); await subscription.unsubscribe(); }
+      setState((current) => ({ ...current, subscribed: false }));
+      return 'off';
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return 'denied';
+    const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(state.publicKey) });
+    await api.savePushSubscription(subscription.toJSON());
+    setState((current) => ({ ...current, subscribed: true }));
+    return 'on';
+  };
+  return { supported: supported && state.ready && state.enabled, subscribed: state.subscribed, toggle };
+}

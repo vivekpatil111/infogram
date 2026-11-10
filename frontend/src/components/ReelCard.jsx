@@ -5,11 +5,14 @@ import { useApp } from '../context';
 import { usePostEngagement } from './postActions';
 import { FollowButton } from './Sheets';
 import { ResourceButton, VerifiedBadge } from './Knowledge';
+import { TipButton } from './Tips';
+import { useVideoSource } from '../hooks';
 
 export function ReelCard({ reel, onHidden }) {
   const { currentUser, openProfile, openPost, openShare, openSheet, openReport, openAbout, showToast } = useApp();
   const { liked, likeCount, saved, toggleLike, toggleSave } = usePostEngagement(reel);
   const videoRef = useRef(null);
+  useVideoSource(videoRef, { hls: reel.hls, mp4: reel.image });
   const [muted, setMuted] = useState(true);
   const [flash, setFlash] = useState(0);
   const [burst, setBurst] = useState(0);
@@ -34,7 +37,7 @@ export function ReelCard({ reel, onHidden }) {
     { label: 'Copy link', onClick: () => { navigator.clipboard?.writeText(postLink(reel.id)); showToast('Link copied'); } },
   ]);
   return <article className="reel-card">
-    <video ref={videoRef} className="reel-video" src={reel.image} poster={reel.poster || undefined} muted={muted} loop playsInline preload="metadata" onClick={toggleMute} onDoubleClick={doubleTapLike}/>
+    <video ref={videoRef} className="reel-video" poster={reel.poster || undefined} muted={muted} loop playsInline preload="metadata" onClick={toggleMute} onDoubleClick={doubleTapLike}/>
     <div className="reel-shade"/>
     <div className="reel-topline"><span/><button onClick={toggleMute} aria-label={muted ? 'Unmute reel' : 'Mute reel'}>{muted ? <VolumeX/> : <Volume2/>}</button></div>
     {flash > 0 && <span key={flash} className="reel-flash" aria-hidden="true">{muted ? <VolumeX/> : <Volume2/>}</span>}
@@ -53,6 +56,7 @@ export function ReelCard({ reel, onHidden }) {
       <button className={liked ? 'reel-liked' : ''} onClick={() => toggleLike()} aria-label={liked ? 'Unlike' : 'Like'}><Heart fill={liked ? 'currentColor' : 'none'}/><span>{formatCount(likeCount)}</span></button>
       <button onClick={() => openPost(reel, { onCommentAdded: () => setCommentCount((count) => count + 1) })} aria-label="Comments"><MessageCircle/><span>{formatCount(commentCount)}</span></button>
       <button onClick={() => openShare(reel)} aria-label="Share"><Send/><span>Share</span></button>
+      <TipButton post={reel} variant="reel"/>
       <button className={saved ? 'reel-saved' : ''} onClick={toggleSave} aria-label={saved ? 'Remove from saved' : 'Save'}><Bookmark fill={saved ? 'currentColor' : 'none'}/><span>{saved ? 'Saved' : 'Save'}</span></button>
       <button onClick={menu} aria-label="More options"><MoreHorizontal/></button>
     </div>

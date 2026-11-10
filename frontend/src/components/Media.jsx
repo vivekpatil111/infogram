@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Heart, Play, Volume2, VolumeX } from 'lucide-react';
+import { useVideoSource } from '../hooks';
 
 // Images fade in once decoded instead of popping in line by line.
 export function FadeImage({ className = '', onLoad, onError, ...props }) {
@@ -11,8 +12,9 @@ export function FadeImage({ className = '', onLoad, onError, ...props }) {
 
 // Feed/modal video: plays muted while on screen, tap to pause, corner mute toggle.
 // No native controls bar over the content.
-function InlineVideo({ src, poster, className }) {
+function InlineVideo({ src, hls, poster, className }) {
   const ref = useRef(null);
+  useVideoSource(ref, { hls, mp4: src });
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
   const [progress, setProgress] = useState(0);
@@ -33,7 +35,7 @@ function InlineVideo({ src, poster, className }) {
     if (video.paused) { setPausedByUser(false); video.play().catch(() => {}); } else { setPausedByUser(true); video.pause(); }
   };
   return <div className="inline-video">
-    <video ref={ref} className={className} src={src} poster={poster || undefined} muted={muted} loop playsInline preload="metadata"
+    <video ref={ref} className={className} poster={poster || undefined} muted={muted} loop playsInline preload="metadata"
       onClick={toggle} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
       onTimeUpdate={(event) => { const v = event.currentTarget; if (v.duration) setProgress(v.currentTime / v.duration); }}/>
     {!playing && <span className="inline-video-play" aria-hidden="true"><Play fill="currentColor"/></span>}
@@ -46,7 +48,7 @@ function InlineVideo({ src, poster, className }) {
 
 // Image, video or carousel. onDoubleTap -> like (with a heart burst).
 export function MediaView({ post, className = 'post-image', onDoubleTap }) {
-  const slides = post.slides?.length ? post.slides : [{ url: post.image, type: post.mediaType === 'video' ? 'video' : 'image', poster: post.poster }];
+  const slides = post.slides?.length ? post.slides : [{ url: post.image, hls: post.hls, type: post.mediaType === 'video' ? 'video' : 'image', poster: post.poster }];
   const [index, setIndex] = useState(0);
   const [burst, setBurst] = useState(0);
   const slide = slides[Math.min(index, slides.length - 1)];
@@ -72,7 +74,7 @@ export function MediaView({ post, className = 'post-image', onDoubleTap }) {
   }, [burst]);
   return <div className="media-frame" onDoubleClick={doubleTap} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
     {slide.type === 'video'
-      ? <InlineVideo key={slide.url} className={className} src={slide.url} poster={slide.poster}/>
+      ? <InlineVideo key={slide.url} className={className} src={slide.url} hls={slide.hls} poster={slide.poster}/>
       : <FadeImage key={slide.url} className={className} src={slide.url} alt={post.caption ? post.caption.slice(0, 120) : `Post by ${post.name}`} loading="lazy" decoding="async"/>}
     {slides.length > 1 && <>
       {index > 0 && <button className="media-arrow left" onClick={() => go(index - 1)} aria-label="Previous"><ChevronLeft/></button>}

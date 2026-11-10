@@ -76,6 +76,12 @@ Without storage credentials, presign falls back to an authenticated local upload
 - **Story stickers.** Stories take `stickers`: up to 3, with at most one poll. The kinds are `{type: "mention", username}`, `{type: "link", url, label?}` and `{type: "poll", question, options: [a, b]}`, each with `x`, `y` as 0-100 percentages. Mentions notify the person (`story_mention`). `POST /api/v1/stories/{id}/vote/ {option: 0|1}` votes once. Poll `counts` are returned after you vote, and always to the author.
 - **Report a problem.** `POST /api/v1/support/problems/ {message, page?}` (throttled). The queue is in admin under Problem reports.
 
+### Push notifications, tips and video streaming
+
+- **Push notifications (Web Push).** `GET /api/v1/notifications/push/` returns `{enabled, public_key}`. `POST` subscribes this device with the browser's subscription JSON (`{endpoint, keys}`), and `DELETE {endpoint}` unsubscribes it. New activity and direct messages are pushed after commit on a background thread; subscriptions the push service reports gone (404/410) are deleted. Needs `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`: run `python manage.py generate_vapid_keys --write` locally, then copy both values into Render.
+- **Tips (Razorpay).** `GET /api/v1/tips/config/`; `POST /api/v1/tips/ {creator, amount (₹10-5000), post_id?, message?}` creates a Razorpay order; `POST /api/v1/tips/verify/` checks the Checkout signature; `POST /api/v1/tips/webhook/` takes signed Razorpay events (`payment.captured`, `order.paid`). Marking a tip paid is idempotent and notifies the creator. `GET /api/v1/tips/received/` and `/tips/sent/` list tips with totals. Needs `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and, for webhooks, `RAZORPAY_WEBHOOK_SECRET`; without them tipping stays hidden. Money lands in the platform's Razorpay account, and paying creators out (Razorpay Route) is not built yet.
+- **HLS video.** New video posts are transcoded in the background into 720p and 480p HLS renditions with 4-second segments. Renditions are never upscaled and handle portrait video. They're uploaded to `users/{id}/hls/{post}/`, and posts return `hls_url` when ready. ffmpeg comes from the `imageio-ffmpeg` wheel. Use `python manage.py transcode_videos` to retry failed or pending videos, and add `--missing` to backfill. Set `HLS_ENABLED=0` to turn it off.
+
 ### Knowledge features
 
 - **Knowledge Verticals.** `GET /api/v1/verticals/` lists the fixed verticals (`slug, name, emoji, description, post_count, expert_count`). Posts take `vertical`; feed, reels and explore accept `?vertical=`.

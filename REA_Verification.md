@@ -74,7 +74,7 @@ menus). Module names only say a surface exists. They don't show how it is built.
 
 ## Not built yet (next steps)
 
-HLS transcoding, push notifications and tipping. (Blocking and muting have shipped: `safety/`.)
+Creator payouts for tips (Razorpay Route) and translation. (Push notifications, tipping and HLS have shipped.)
 
 ## Infogram's own features (not on Instagram)
 

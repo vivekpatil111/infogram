@@ -7,6 +7,7 @@ import { usePostEngagement, usePostMenu } from './postActions';
 import { FollowButton } from './Sheets';
 import { ListSkeleton, Spinner } from './Skeleton';
 import { EmojiButton, insertAtCaret } from './Emoji';
+import { TipButton } from './Tips';
 import { PathChip, ResourceButton, VerifiedBadge } from './Knowledge';
 
 // Post detail: media, caption and the full comment thread.
@@ -140,6 +141,7 @@ function PostDetail({ post, onClose, onCommentAdded, onDeleted, lesson }) {
           <button onClick={() => toggleLike()} className={liked ? 'liked' : ''} aria-label={liked ? 'Unlike' : 'Like'}><Heart fill={liked ? 'currentColor' : 'none'}/></button>
           <button onClick={() => inputRef.current?.focus()} aria-label="Comment"><MessageCircle/></button>
           <button onClick={() => openShare(post)} aria-label="Share"><Send/></button>
+          <TipButton post={post}/>
         </div>
         <div className="post-actions-right">
           <ResourceButton post={post}/>

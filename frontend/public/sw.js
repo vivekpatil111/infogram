@@ -1,6 +1,6 @@
 // Infogram service worker: app shell offline, hashed assets cached forever.
 // API calls go to another origin and are never cached here.
-const VERSION = 'infogram-v1';
+const VERSION = 'infogram-v2';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -37,4 +37,27 @@ self.addEventListener('fetch', (event) => {
       })),
     );
   }
+});
+
+// ---- Push notifications ----
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data && event.data.text() }; }
+  event.waitUntil(self.registration.showNotification(data.title || 'Infogram', {
+    body: data.body || '',
+    icon: data.icon || '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: data.tag,
+    data: { url: data.url || '/' },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+    const open = windows.find((client) => client.url.startsWith(self.location.origin));
+    if (open) { open.focus(); return open.navigate(target); }
+    return self.clients.openWindow(target);
+  }));
 });

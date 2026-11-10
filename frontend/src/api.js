@@ -154,6 +154,7 @@ export function normalizePost(post) {
     location: post.location || null, // { name, slug }
     image: post.media_url,
     poster: post.thumbnail_url || '',
+    hls: post.hls_url || '',
     mediaType: post.media_type,
     slides: (post.media || []).map((slide) => ({ url: slide.media_url, type: slide.media_type, poster: slide.thumbnail_url || '' })),
     caption: post.caption || '',
@@ -585,3 +586,23 @@ export const deletePath = (pathId) => apiRequest(`/paths/${pathId}/`, { method: 
 export const fetchExpertStatus = () => apiRequest('/auth/expert-application/');
 export const applyForExpert = (application) =>
   apiRequest('/auth/expert-application/', { method: 'POST', body: JSON.stringify(application) });
+
+// ---------------------------------------------------------------------------
+// Push notifications, tips
+// ---------------------------------------------------------------------------
+
+export const fetchPushConfig = () => apiRequest('/notifications/push/');
+export const savePushSubscription = (subscription) =>
+  apiRequest('/notifications/push/', { method: 'POST', body: JSON.stringify(subscription) });
+export const deletePushSubscription = (endpoint) =>
+  apiRequest('/notifications/push/', { method: 'DELETE', body: JSON.stringify({ endpoint }) });
+
+let tipConfigPromise = null;
+export function fetchTipConfig() {
+  tipConfigPromise = tipConfigPromise || apiRequest('/tips/config/').catch((error) => { tipConfigPromise = null; throw error; });
+  return tipConfigPromise;
+}
+export const createTip = ({ creator, amount, postId, message }) =>
+  apiRequest('/tips/', { method: 'POST', body: JSON.stringify({ creator, amount, post_id: postId || null, message }) });
+export const verifyTip = (payment) => apiRequest('/tips/verify/', { method: 'POST', body: JSON.stringify(payment) });
+export const fetchTips = (direction) => apiRequest(`/tips/${direction}/`);
