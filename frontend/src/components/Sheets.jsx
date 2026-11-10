@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronRight, Link2, Search, Send, X } from 'lucide-react';
-import { REPORT_REASONS, avatarOf, createConversation, fetchFollowList, fetchLikers, fetchProfile, postLink, reportContent, searchContent, sendConversationMessage } from '../api';
+import { REPORT_REASONS, reportProblem, avatarOf, createConversation, fetchFollowList, fetchLikers, fetchProfile, postLink, reportContent, searchContent, sendConversationMessage } from '../api';
 import { useApp } from '../context';
 import { useDebounced } from '../hooks';
 import { ListSkeleton } from './Skeleton';
@@ -216,4 +216,27 @@ export function AboutAccountModal({ username, onClose }) {
 // "Liked by" list for a post.
 export function LikesModal({ postId, onClose }) {
   return <PeopleModal title="Likes" load={() => fetchLikers(postId)} emptyText="No likes yet." onClose={onClose}/>;
+}
+
+// "Report a problem": something in the app is broken.
+export function ProblemModal({ onClose }) {
+  const { showToast } = useApp();
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const send = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try { await reportProblem(message.trim()); showToast("Thanks, we've got it. We'll look into it."); onClose(); } catch (requestError) { setError(requestError.message); } finally { setBusy(false); }
+  };
+  return <div className="modal-backdrop menu-backdrop" onClick={onClose}><section className="report-sheet" onClick={stop}>
+    <header><b>Report a problem</b><button onClick={onClose} aria-label="Close"><X/></button></header>
+    <div className="report-confirm">
+      <p className="report-question">What went wrong?</p>
+      <textarea autoFocus value={message} onChange={(event) => setMessage(event.target.value)} rows="5" maxLength="2000" placeholder="Briefly explain what happened and what you expected. The page you're on is sent with your report."/>
+      {error && <p className="auth-error" role="alert">{error}</p>}
+      <div className="report-actions"><button onClick={onClose}>Cancel</button><button className="report-submit" onClick={send} disabled={busy || message.trim().length < 5}>{busy ? 'Sending…' : 'Send report'}</button></div>
+    </div>
+  </section></div>;
 }

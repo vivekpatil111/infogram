@@ -3,6 +3,7 @@ import { CheckSquare, FileText, Link2, MapPin, Trash2, X } from 'lucide-react';
 import { createPost, createStory, fetchLocations, normalizePost, uploadMedia } from '../api';
 import { useDebounced } from '../hooks';
 import { useVerticals } from './Knowledge';
+import { StickerComposer } from './StoryStickers';
 
 const MAX_RESOURCES = 5;
 import { useApp } from '../context';
@@ -20,6 +21,7 @@ export function CreateSheet({ initialType = 'post', onClose, onCreated }) {
   const [topic, setTopic] = useState('');
   const verticals = useVerticals();
   const [vertical, setVertical] = useState('');
+  const [stickers, setStickers] = useState([]);
   const [resources, setResources] = useState([]); // {kind, title, url, itemsText, file?}
   const addResource = (kind) => setResources((current) => (current.length >= MAX_RESOURCES ? current : [...current, { kind, title: '', url: '', itemsText: '' }]));
   const patchResource = (index, change) => setResources((current) => current.map((item, i) => (i === index ? { ...item, ...change } : item)));
@@ -46,7 +48,7 @@ export function CreateSheet({ initialType = 'post', onClose, onCreated }) {
   const [error, setError] = useState('');
   useEffect(() => () => files.forEach((file) => URL.revokeObjectURL(file.preview)), [files]);
 
-  const switchType = (next) => { setType(next); setFiles([]); setError(''); };
+  const switchType = (next) => { setType(next); setFiles([]); setStickers([]); setError(''); };
   const choose = (event) => {
     const picked = [...(event.target.files || [])];
     event.target.value = '';
@@ -85,7 +87,7 @@ export function CreateSheet({ initialType = 'post', onClose, onCreated }) {
       }
       setProgress('Publishing…');
       if (type === 'story') {
-        await createStory({ mediaType: uploaded[0].media_type, mediaUrl: uploaded[0].media_url, caption: caption.trim().slice(0, 180) });
+        await createStory({ mediaType: uploaded[0].media_type, mediaUrl: uploaded[0].media_url, caption: caption.trim().slice(0, 180), stickers });
         showToast('Added to your story');
         onCreated?.('story');
       } else {
@@ -109,8 +111,10 @@ export function CreateSheet({ initialType = 'post', onClose, onCreated }) {
     <header><b>Create new {type}</b><button onClick={onClose} disabled={Boolean(progress)} aria-label="Close create dialog"><X/></button></header>
     <div className="create-tabs">{['post', 'reel', 'story'].map((name) => <button key={name} className={type === name ? 'active-create-tab' : ''} onClick={() => switchType(name)} disabled={Boolean(progress)}>{name[0].toUpperCase() + name.slice(1)}</button>)}</div>
     {files.length
-      ? <div className="create-preview">
-        {files[0].kind === 'video' ? <video src={files[0].preview} controls playsInline/> : <img src={files[0].preview} alt="Selected preview"/>}
+      ? <div className={`create-preview ${type === 'story' ? 'story-compose' : ''}`}>
+        {type === 'story'
+          ? <StickerComposer stickers={stickers} setStickers={setStickers}>{files[0].kind === 'video' ? <video src={files[0].preview} muted loop autoPlay playsInline/> : <img src={files[0].preview} alt="Selected preview"/>}</StickerComposer>
+          : files[0].kind === 'video' ? <video src={files[0].preview} controls playsInline/> : <img src={files[0].preview} alt="Selected preview"/>}
         {files.length > 1 || type === 'post'
           ? <div className="create-thumbs">
             {files.map((item, index) => <span key={item.preview}>{item.kind === 'video' ? <video src={item.preview} muted/> : <img src={item.preview} alt=""/>}<button onClick={() => removeFile(index)} aria-label="Remove file">×</button></span>)}

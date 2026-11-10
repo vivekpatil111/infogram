@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Eye, MoreHorizontal, Send, Trash2, X } from 'lucide-react';
 import { createConversation, deleteStory, fetchStoryViewers, markStoryViewed, sendConversationMessage, setUserMuted } from '../api';
 import { useApp } from '../context';
+import { StickerLayer } from './StoryStickers';
 
 const IMAGE_SECONDS = 5;
 
@@ -108,6 +109,7 @@ export function StoryViewer({ groups, startIndex, onClose, onChanged }) {
       ? <video key={story.id} className="story-image" src={story.media} autoPlay playsInline onEnded={() => move(1)}/>
       : <img key={story.id} className="story-image" src={story.media} alt={story.caption || `Story by ${group.name}`}/>}
     {story.caption && <p className="story-caption">{story.caption}</p>}
+    {story.stickers.length > 0 && <StickerLayer key={`stickers-${story.id}`} story={story} onPause={() => setPaused(true)} onOpenProfile={(name) => { onClose(); openProfile(name); }}/>}
     <button className="story-nav previous" onClick={() => move(-1)} aria-label="Previous story"><ChevronLeft/></button>
     <button className="story-nav next" onClick={() => move(1)} aria-label="Next story"><ChevronRight/></button>
     {group.isOwn

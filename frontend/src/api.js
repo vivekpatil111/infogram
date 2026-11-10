@@ -207,12 +207,28 @@ const userRow = (user) => ({
 // Auth & account
 // ---------------------------------------------------------------------------
 
+// Returns { twoFactor: { challenge } } when the account uses two-step login;
+// call verifyTwoFactor(challenge, code) next.
 export async function login(username, password) {
   const response = await apiRequest('/auth/login/', { method: 'POST', body: JSON.stringify({ username, password }) });
-  window.localStorage.setItem('infogram_access_token', response.access);
-  if (response.refresh) window.localStorage.setItem('infogram_refresh_token', response.refresh);
+  if (response.two_factor_required) return { twoFactor: { challenge: response.challenge } };
+  storeTokens(response);
   return response;
 }
+
+function storeTokens(response) {
+  window.localStorage.setItem('infogram_access_token', response.access);
+  if (response.refresh) window.localStorage.setItem('infogram_refresh_token', response.refresh);
+}
+
+export async function verifyTwoFactor(challenge, code) {
+  const response = await apiRequest('/auth/2fa/verify/', { method: 'POST', body: JSON.stringify({ challenge, code: code.trim() }) });
+  storeTokens(response);
+  return response;
+}
+
+export const fetchTwoFactor = () => apiRequest('/auth/2fa/');
+export const twoFactorStep = (step, body = {}) => apiRequest(`/auth/2fa/${step}/`, { method: 'POST', body: JSON.stringify(body) });
 
 export const register = ({ username, email, password }) =>
   apiRequest('/auth/register/', { method: 'POST', body: JSON.stringify({ username, email, password }) });
@@ -337,12 +353,18 @@ export async function fetchStoryTray() {
       caption: story.caption || '',
       time: relativeTime(story.created_at),
       viewed: Boolean(story.viewed_by_me),
+      stickers: story.stickers || [],
     })),
   }));
 }
 
-export const createStory = ({ mediaType, mediaUrl, caption = '' }) =>
-  apiRequest('/stories/', { method: 'POST', body: JSON.stringify({ media_type: mediaType, media_url: mediaUrl, caption }) });
+export const createStory = ({ mediaType, mediaUrl, caption = '', stickers = [] }) =>
+  apiRequest('/stories/', { method: 'POST', body: JSON.stringify({ media_type: mediaType, media_url: mediaUrl, caption, stickers }) });
+// Answer a story poll; returns the story with counts once you've voted.
+export const voteStoryPoll = (storyId, option) =>
+  apiRequest(`/stories/${storyId}/vote/`, { method: 'POST', body: JSON.stringify({ option }) });
+export const reportProblem = (message) =>
+  apiRequest('/support/problems/', { method: 'POST', body: JSON.stringify({ message, page: window.location.pathname }) });
 export const deleteStory = (storyId) => apiRequest(`/stories/${storyId}/`, { method: 'DELETE' });
 export const markStoryViewed = (storyId) => apiRequest(`/stories/${storyId}/view/`, { method: 'POST' });
 

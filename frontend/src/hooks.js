@@ -70,3 +70,50 @@ export function readStored(key, fallback) {
 export function writeStored(key, value) {
   try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
 }
+
+// Appearance: 'light' | 'dark' | 'system' (follows the device). The resolved
+// theme is written to <html data-theme>, which dark.css keys off.
+const THEME_KEY = 'infogram_theme';
+export function applyTheme(choice) {
+  const dark = choice === 'dark' || (choice === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#000000' : '#ffffff');
+}
+export function useTheme() {
+  const [theme, setThemeState] = useState(() => readStored(THEME_KEY, 'system'));
+  useEffect(() => {
+    applyTheme(theme);
+    if (theme !== 'system' || !window.matchMedia) return undefined;
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const follow = () => applyTheme('system');
+    query.addEventListener?.('change', follow);
+    return () => query.removeEventListener?.('change', follow);
+  }, [theme]);
+  const setTheme = (next) => { writeStored(THEME_KEY, next); setThemeState(next); };
+  return [theme, setTheme];
+}
+
+// "Install app": the browser's install prompt, kept until the user asks for it.
+let deferredInstall = null;
+const installListeners = new Set();
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstall = event;
+    installListeners.forEach((listener) => listener(true));
+  });
+  window.addEventListener('appinstalled', () => { deferredInstall = null; installListeners.forEach((listener) => listener(false)); });
+}
+export function useInstallPrompt() {
+  const [available, setAvailable] = useState(Boolean(deferredInstall));
+  useEffect(() => { installListeners.add(setAvailable); return () => installListeners.delete(setAvailable); }, []);
+  const install = async () => {
+    if (!deferredInstall) return false;
+    deferredInstall.prompt();
+    const { outcome } = await deferredInstall.userChoice;
+    deferredInstall = null;
+    setAvailable(false);
+    return outcome === 'accepted';
+  };
+  return [available, install];
+}

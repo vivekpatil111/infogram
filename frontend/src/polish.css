@@ -501,3 +501,80 @@ a.resource:hover { background: #fafafa; }
 .expert-submit { border: 0; background: #0095f6; color: #fff; border-radius: 8px; padding: 8px 14px; font-weight: 700; font-size: 13px; }
 .expert-submit:disabled { background: #b2dffc; }
 .pdf-pick input[type="file"] { display: none !important; }
+
+/* =====================  Story stickers  ===================== */
+.sticker-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.story-sticker { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; animation: pop-in .3s var(--ease-spring); }
+.story-sticker.mention button, .sticker-chip { display: inline-flex; align-items: center; gap: 5px; border: 0; background: #fff; color: #7c3aed; font-weight: 800; font-size: 15px; padding: 7px 13px; border-radius: 10px; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); white-space: nowrap; }
+.story-sticker.link a, .sticker-chip.link { display: inline-flex; align-items: center; gap: 6px; background: #fff; color: #0369a1; text-decoration: none; font-weight: 700; font-size: 14px; padding: 8px 14px; border-radius: 999px; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.story-sticker.link svg, .sticker-chip.link svg { width: 15px; height: 15px; flex: none; }
+.poll-card { width: 230px; background: #fff; color: #262626; border-radius: 16px; padding: 14px 12px 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, .28); text-align: center; display: grid; gap: 8px; }
+.poll-card b { font-size: 15px; line-height: 1.25; }
+.poll-options { display: grid; gap: 6px; }
+.poll-options button, .poll-options span { position: relative; overflow: hidden; border: 0; background: #f2f2f2; border-radius: 10px; padding: 10px 12px; font-weight: 700; font-size: 14px; display: flex; justify-content: space-between; align-items: center; color: #262626; }
+.poll-options button:hover:not(:disabled) { background: #e8e8e8; }
+.poll-options button:disabled { cursor: default; }
+.poll-options button i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #ddd6fe, #bfdbfe); transition: width .6s var(--ease-out); }
+.poll-options button.mine i { background: linear-gradient(90deg, #c4b5fd, #93c5fd); }
+.poll-options button span, .poll-options button em { position: relative; background: none; padding: 0; font-style: normal; }
+.poll-options span { justify-content: center; }
+.poll-card small { color: #737373; font-size: 11px; }
+.poll-card.preview { pointer-events: none; }
+
+/* composer */
+.sticker-composer { display: grid; gap: 10px; width: 100%; }
+.sticker-frame { position: relative; border-radius: 12px; overflow: hidden; background: #111; touch-action: none; aspect-ratio: 9 / 16; max-height: 420px; margin: 0 auto; }
+.sticker-frame > img, .sticker-frame > video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.story-sticker.draggable { cursor: grab; user-select: none; }
+.story-sticker.draggable:active { cursor: grabbing; }
+.sticker-remove { position: absolute; top: -9px; right: -9px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: #262626; color: #fff; display: grid; place-items: center; padding: 0; }
+.sticker-remove svg { width: 13px; height: 13px; }
+.sticker-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: center; }
+.sticker-tools button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #dbdbdb; background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 700; }
+.sticker-tools button:disabled { opacity: .4; }
+.sticker-tools svg { width: 15px; height: 15px; }
+.sticker-tools small { color: #737373; font-size: 11px; width: 100%; text-align: center; }
+.sticker-form { display: grid; gap: 6px; background: #fafafa; border-radius: 12px; padding: 10px; animation: rise-in .2s var(--ease-out); }
+.sticker-form-row { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
+.sticker-form-row input { flex: 1; min-width: 0; }
+.sticker-add { border: 0; background: #0095f6; color: #fff; border-radius: 8px; padding: 7px 14px; font-weight: 700; font-size: 13px; }
+
+/* =====================  Two-step login  ===================== */
+.otp-input { letter-spacing: .3em; font-size: 20px !important; text-align: center; font-variant-numeric: tabular-nums; }
+.two-factor legend svg { color: #16a34a; }
+.two-factor-setup { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.two-factor-setup img { border-radius: 10px; border: 1px solid #efefef; background: #fff; flex: none; }
+.two-factor-setup .expert-form { flex: 1; min-width: 200px; }
+.secret-key { display: inline-block; font-size: 12px; background: #f2f2f2; padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+.recovery-codes ul { list-style: none; margin: 8px 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.recovery-codes code { display: block; background: #f2f2f2; border-radius: 6px; padding: 6px 8px; text-align: center; font-size: 13px; }
+.text-button.danger, .expert-submit.danger { color: #ed4956; }
+.expert-submit.danger { background: #ed4956; color: #fff; }
+
+/* appearance switch in the More menu */
+.more-menu .appearance-item span { margin-left: auto; color: #737373; font-size: 13px; }
+
+/* ---- dark mode: raised surfaces (menus, sheets, popovers) sit above the black page ---- */
+html[data-theme="dark"] .more-menu, html[data-theme="dark"] .emoji-popover, html[data-theme="dark"] .location-options,
+html[data-theme="dark"] .post-menu, html[data-theme="dark"] .create-sheet, html[data-theme="dark"] .report-sheet,
+html[data-theme="dark"] .new-message-sheet, html[data-theme="dark"] .share-sheet, html[data-theme="dark"] .resource-drawer,
+html[data-theme="dark"] .post-modal, html[data-theme="dark"] .search-panel, html[data-theme="dark"] .toast {
+  background: #1c1c1c; box-shadow: 0 0 0 1px #2e2e2e, 0 10px 40px rgba(0, 0, 0, .6);
+}
+html[data-theme="dark"] .more-menu button:hover, html[data-theme="dark"] .location-options button:hover,
+html[data-theme="dark"] .emoji-popover button:hover { background: #2a2a2a; }
+html[data-theme="dark"] .more-menu hr { background: #2a2a2a; }
+html[data-theme="dark"] .fade-media, html[data-theme="dark"] .explore-tile, html[data-theme="dark"] .profile-tile { --sk-base: #1a1a1a; }
+html[data-theme="dark"] { --sk-base: #1f1f1f; --sk-shine: #2a2a2a; }
+
+/* story composer lives inside .create-preview; undo its fixed height and overlay buttons */
+.create-preview.story-compose { height: auto; display: grid; gap: 10px; justify-items: center; background: transparent; overflow: visible; }
+.create-preview.story-compose .sticker-frame { width: min(100%, 240px); }
+.create-preview.story-compose button { position: static; }
+.create-preview.story-compose .sticker-tools button, .create-preview.story-compose .sticker-add { background: #fff; color: #262626; padding: 6px 12px; border: 1px solid #dbdbdb; border-radius: 999px; font-size: 12px; }
+.create-preview.story-compose .sticker-add { background: #0095f6; color: #fff; border-color: #0095f6; border-radius: 8px; }
+.create-preview.story-compose .sticker-form .text-button { background: none; color: #262626; }
+.create-preview.story-compose .sticker-remove { position: absolute; padding: 0; background: #262626; }
+.create-preview.story-compose > button { background: #efefef; color: #262626; }
+.create-preview.story-compose .sticker-form { width: 100%; }
+.sticker-frame .poll-card { width: 180px; padding: 10px 8px 8px; } .sticker-frame .poll-options span { padding: 7px 10px; font-size: 13px; }

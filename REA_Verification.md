@@ -64,18 +64,17 @@ menus). Module names only say a surface exists. They don't show how it is built.
 | Relative times ("2 d", "1 w") linking to the post | ✅ | `relativeTime` |
 | `explore/locations` | ✅ **new**: tag a place on a post, location page, places in search | `discovery/views.py`, `pages/Location.jsx` |
 | "See Translation" | ❌ needs a translation service | |
-| Story stickers: mention, link, post (`StoriesV3*StickerPopover`) | ❌ | |
+| Story stickers: mention, link, post (`StoriesV3*StickerPopover`) | ✅ **new**: mention, link and poll stickers, drag to place | `stories/serializers.py`, `StoryStickers.jsx` |
 | Profile with several links (`ProfilePageMultipleLinksModal`) | ✅ **new**: up to 5 links, first inline plus "and N more" | `accounts/serializers.py`, `pages/Profile.jsx` |
-| Two-factor and one-tap login (`TwoFactorLogin`, `OneTapLogin`) | ❌ | |
-| Report a problem (`BugReportModal`) | ❌ | |
+| Two-factor login (`TwoFactorLogin`) | ✅ **new**: authenticator app (TOTP) plus recovery codes | `accounts/totp.py` |
+| Report a problem (`BugReportModal`) | ✅ **new** | `safety/views.py` |
 | Inbox notes (`InboxTrayItemPopover`) | ❌ | |
 | Keyboard shortcuts (`KeyCommandNub`), screen time, cookie consent, app upsells | ➖ not planned for the MVP | |
 | Threads, Meta AI and other Meta product links | ➖ not applicable | |
 
 ## Not built yet (next steps)
 
-Story stickers, two-factor login, and
-HLS transcoding. (Blocking and muting have shipped: `safety/`.)
+HLS transcoding, push notifications and tipping. (Blocking and muting have shipped: `safety/`.)
 
 ## Infogram's own features (not on Instagram)
 

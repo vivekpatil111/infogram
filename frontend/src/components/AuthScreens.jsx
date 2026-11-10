@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { confirmPasswordReset, login, register, requestPasswordReset } from '../api';
+import { confirmPasswordReset, login, register, requestPasswordReset, verifyTwoFactor } from '../api';
 
 export function AuthScreen({ onSuccess }) {
   const [mode, setMode] = useState('login');
@@ -9,7 +9,9 @@ export function AuthScreen({ onSuccess }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  const switchMode = (next) => { setMode(next); setError(''); setNotice(''); };
+  const [challenge, setChallenge] = useState(null);
+  const [code, setCode] = useState('');
+  const switchMode = (next) => { setMode(next); setError(''); setNotice(''); setChallenge(null); setCode(''); };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -22,8 +24,14 @@ export function AuthScreen({ onSuccess }) {
         setNotice((await requestPasswordReset(email.trim())).detail);
         return;
       }
+      if (challenge) {
+        await verifyTwoFactor(challenge, code);
+        onSuccess();
+        return;
+      }
       if (mode === 'register') await register({ username: username.trim(), email: email.trim(), password });
-      await login(username.trim(), password);
+      const result = await login(username.trim(), password);
+      if (result.twoFactor) { setChallenge(result.twoFactor.challenge); return; }
       onSuccess();
     } catch (requestError) {
       setError(requestError.message);
@@ -41,15 +49,21 @@ export function AuthScreen({ onSuccess }) {
         <button className={mode === 'login' ? 'active-auth-tab' : ''} onClick={() => switchMode('login')}>Log in</button>
         <button className={mode === 'register' ? 'active-auth-tab' : ''} onClick={() => switchMode('register')}>Create account</button>
       </div>}
-    <form className="auth-form" onSubmit={submit}>
+    {challenge ? <form className="auth-form" onSubmit={submit}>
+      <p className="auth-forgot-title"><b>Two-step login</b><br/>Enter the 6-digit code from your authenticator app, or one of your recovery codes.</p>
+      <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="123 456" inputMode="numeric" autoComplete="one-time-code" autoFocus required aria-label="Authentication code" className="otp-input"/>
+      {error && <p className="auth-error" role="alert">{error}</p>}
+      <button className="auth-submit" disabled={busy || code.trim().length < 6}>{busy ? 'Checking…' : 'Confirm'}</button>
+      <button type="button" className="auth-link" onClick={() => switchMode('login')}>Back to log in</button>
+    </form> : <form className="auth-form" onSubmit={submit}>
       {mode !== 'forgot' && <input value={username} onChange={(event) => setUsername(event.target.value)} placeholder={mode === 'login' ? 'Username or email' : 'Username'} autoComplete="username" required />}
       {mode !== 'login' && <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" type="email" autoComplete="email" required />}
       {mode !== 'forgot' && <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password (8+ characters)" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength="8" required />}
       {error && <p className="auth-error" role="alert">{error}</p>}
       {notice && <p className="auth-notice" role="status">{notice}</p>}
       <button className="auth-submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in' : mode === 'register' ? 'Create account' : 'Send reset link'}</button>
-    </form>
-    {mode === 'login' && <button className="auth-link" onClick={() => switchMode('forgot')}>Forgot password?</button>}
+    </form>}
+    {mode === 'login' && !challenge && <button className="auth-link" onClick={() => switchMode('forgot')}>Forgot password?</button>}
     {mode === 'forgot' && <button className="auth-link" onClick={() => switchMode('login')}>Back to log in</button>}
   </section></main>;
 }

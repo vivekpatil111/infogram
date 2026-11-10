@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Bookmark, BookOpenText, Clapperboard, Compass, Heart, House, LogOut, Menu, PlusSquare, Search, Send, Settings, UserRound } from 'lucide-react';
+import { Activity, Bookmark, BookOpenText, Download, LifeBuoy, Moon, Sun, SunMoon, Clapperboard, Compass, Heart, House, LogOut, Menu, PlusSquare, Search, Send, Settings, UserRound } from 'lucide-react';
 import { SESSION_EXPIRED_EVENT, avatarOf, fetchCurrentUser, fetchUnreadCounts, hasAccessToken, logout, setUserFollow } from './api';
 import { AppContext } from './context';
+import { useInstallPrompt, useTheme } from './hooks';
 import { AuthScreen, ResetPasswordScreen } from './components/AuthScreens';
 import { CreateSheet } from './components/CreateSheet';
 import { PostModal } from './components/PostModal';
-import { AboutAccountModal, ActionSheet, LikesModal, ReportSheet, ShareSheet } from './components/Sheets';
+import { AboutAccountModal, ActionSheet, LikesModal, ProblemModal, ReportSheet, ShareSheet } from './components/Sheets';
 import { ActivityPage } from './pages/Activity';
 import { ExplorePage } from './pages/Explore';
 import { HomePage } from './pages/Home';
@@ -70,6 +71,9 @@ export default function App() {
   const [about, setAbout] = useState(null);
   const [likesFor, setLikesFor] = useState(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [problemOpen, setProblemOpen] = useState(false);
+  const [theme, setTheme] = useTheme();
+  const [canInstall, installApp] = useInstallPrompt();
   const [toast, setToast] = useState('');
   const toastTimer = useRef(null);
 
@@ -205,7 +209,12 @@ export default function App() {
             {[[Settings, 'Settings', () => navigate('Profile', { username: currentUser.username, edit: true })],
               [Activity, 'Your activity', () => navigate('Activity')],
               [Bookmark, 'Saved', () => navigate('Profile', { username: currentUser.username, tab: 'saved' })],
+              [LifeBuoy, 'Report a problem', () => setProblemOpen(true)],
             ].map(([Icon, label, action]) => <button key={label} role="menuitem" onClick={() => { setMoreOpen(false); action(); }}><Icon/>{label}</button>)}
+            <button role="menuitem" className="appearance-item" onClick={() => setTheme({ system: 'light', light: 'dark', dark: 'system' }[theme])}>
+              {theme === 'dark' ? <Moon/> : theme === 'light' ? <Sun/> : <SunMoon/>}Appearance<span>{{ system: 'Auto', light: 'Light', dark: 'Dark' }[theme]}</span>
+            </button>
+            {canInstall && <button role="menuitem" onClick={async () => { setMoreOpen(false); if (await installApp()) showToast('Infogram is installed'); }}><Download/>Install app</button>}
             <hr/>
             <button role="menuitem" onClick={logoutUser}><LogOut/>Log out</button>
           </div></>}
@@ -241,6 +250,7 @@ export default function App() {
       {sheet && <ActionSheet actions={sheet.actions} title={sheet.title} onClose={() => setSheet(null)}/>}
       {about && <AboutAccountModal username={about} onClose={() => setAbout(null)}/>}
       {likesFor && <LikesModal postId={likesFor} onClose={() => setLikesFor(null)}/>}
+      {problemOpen && <ProblemModal onClose={() => setProblemOpen(false)}/>}
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   </AppContext.Provider>;

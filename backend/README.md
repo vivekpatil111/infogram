@@ -70,6 +70,12 @@ Without storage credentials, presign falls back to an authenticated local upload
 - `GET /api/v1/locations/?q=` suggests places, most used first. `GET /api/v1/locations/{slug}/` returns `location: {name, slug, post_count}` plus that place's visible posts, newest first (cursor). `GET /search/` also returns `locations`.
 - `PATCH /api/v1/auth/me/` accepts `links`: up to 5 `{title?, url}`. Only http(s) URLs are allowed; a bare domain gets `https://`. Profiles return `links`.
 
+### Account security, stories and support
+
+- **Two-step login (TOTP).** `GET /api/v1/auth/2fa/`, `POST /api/v1/auth/2fa/setup/` (returns `secret` and an `otpauth_uri` for authenticator apps), `POST .../enable/ {code}` (returns 8 recovery codes, shown once), and `POST .../disable/ {password, code}`. When it's on, `POST /auth/login/` returns `{two_factor_required, challenge}` instead of tokens; then `POST /api/v1/auth/2fa/verify/ {challenge, code}` returns tokens. Challenges expire after 5 minutes, codes can't be reused, and each recovery code works once. Pure standard library, RFC 6238.
+- **Story stickers.** Stories take `stickers`: up to 3, with at most one poll. The kinds are `{type: "mention", username}`, `{type: "link", url, label?}` and `{type: "poll", question, options: [a, b]}`, each with `x`, `y` as 0-100 percentages. Mentions notify the person (`story_mention`). `POST /api/v1/stories/{id}/vote/ {option: 0|1}` votes once. Poll `counts` are returned after you vote, and always to the author.
+- **Report a problem.** `POST /api/v1/support/problems/ {message, page?}` (throttled). The queue is in admin under Problem reports.
+
 ### Knowledge features
 
 - **Knowledge Verticals.** `GET /api/v1/verticals/` lists the fixed verticals (`slug, name, emoji, description, post_count, expert_count`). Posts take `vertical`; feed, reels and explore accept `?vertical=`.

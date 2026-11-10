@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BadgeCheck, Bookmark, Camera, Clapperboard, Grid3x3, Heart, Layers, Link2, MessageCircle, MoreHorizontal, Plus, Route, Trash2, X } from 'lucide-react';
-import { applyForExpert, avatarOf, changePassword, fetchBlockedAccounts, fetchExpertStatus, fetchFollowList, fetchPaths, fetchProfile, formatCount, setUserBlocked, setUserMuted, updateProfile, uploadMedia } from '../api';
+import { BadgeCheck, ShieldCheck, Bookmark, Camera, Clapperboard, Grid3x3, Heart, Layers, Link2, MessageCircle, MoreHorizontal, Plus, Route, Trash2, X } from 'lucide-react';
+import { applyForExpert, fetchTwoFactor, twoFactorStep, avatarOf, changePassword, fetchBlockedAccounts, fetchExpertStatus, fetchFollowList, fetchPaths, fetchProfile, formatCount, setUserBlocked, setUserMuted, updateProfile, uploadMedia } from '../api';
 import { VerifiedBadge, useVerticals } from '../components/Knowledge';
 import { PathEditor } from '../components/PathEditor';
+import QRCode from 'qrcode';
 import { useApp } from '../context';
 import { FollowButton, PeopleModal } from '../components/Sheets';
 
@@ -225,6 +226,7 @@ function ProfileEditModal({ onClose, onSaved }) {
           <input type="password" autoComplete="new-password" placeholder="Confirm new password" minLength="8" value={passwords.confirm} onChange={(event) => setPasswords({ ...passwords, confirm: event.target.value })}/>
           <small>Changing it signs you out on other devices.</small>
         </fieldset>}
+      <TwoFactorSection/>
       <ExpertSection/>
       <button type="button" className="text-button" onClick={() => setBlocked(true)}>Blocked accounts</button>
       {error && <p className="auth-error" role="alert">{error}</p>}
@@ -285,5 +287,72 @@ function ExpertSection() {
             <div className="expert-form-actions"><button type="button" className="text-button" onClick={() => setForm(null)}>Cancel</button>
               <button type="button" className="expert-submit" onClick={submit} disabled={busy || !form.vertical || !form.title.trim() || !form.evidence_url.trim()}>{busy ? 'Sending…' : 'Submit application'}</button></div>
           </div>}
+  </fieldset>;
+}
+
+// Two-step login: scan a QR code in an authenticator app, confirm a code, keep the recovery codes.
+function TwoFactorSection() {
+  const [state, setState] = useState(null); // {enabled, recovery_codes_left}
+  const [setup, setSetup] = useState(null); // {secret, otpauth_uri, qr}
+  const [codes, setCodes] = useState(null);
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [disabling, setDisabling] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { fetchTwoFactor().then(setState).catch(() => {}); }, []);
+  if (!state) return null;
+  const run = async (fn) => { setBusy(true); setError(''); try { await fn(); } catch (requestError) { setError(requestError.message); } finally { setBusy(false); } };
+  const start = () => run(async () => {
+    const data = await twoFactorStep('setup');
+    // SVG output needs no <canvas>, so it renders the same everywhere.
+    const svg = await QRCode.toString(data.otpauth_uri, { type: 'svg', margin: 1, width: 180 });
+    setSetup({ ...data, qr: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` });
+  });
+  const enable = () => run(async () => {
+    const data = await twoFactorStep('enable', { code });
+    setCodes(data.recovery_codes);
+    setSetup(null);
+    setCode('');
+    setState({ enabled: true, recovery_codes_left: data.recovery_codes.length });
+  });
+  const disable = () => run(async () => {
+    await twoFactorStep('disable', { password, code });
+    setState({ enabled: false, recovery_codes_left: 0 });
+    setDisabling(false);
+    setPassword('');
+    setCode('');
+  });
+  return <fieldset className="expert-section two-factor"><legend><ShieldCheck/>Two-step login</legend>
+    {codes && <div className="recovery-codes">
+      <p className="expert-status verified"><b>Two-step login is on.</b> Save these recovery codes somewhere safe. Each works once if you lose your phone. They won't be shown again.</p>
+      <ul>{codes.map((item) => <li key={item}><code>{item}</code></li>)}</ul>
+      <button type="button" className="text-button" onClick={() => { navigator.clipboard?.writeText(codes.join('\n')); }}>Copy codes</button>
+    </div>}
+    {!codes && state.enabled && !disabling && <>
+      <p className="expert-status verified">On. You'll be asked for a code from your authenticator app when you log in. {state.recovery_codes_left} recovery codes left.</p>
+      <button type="button" className="text-button danger" onClick={() => setDisabling(true)}>Turn off</button>
+    </>}
+    {disabling && <div className="expert-form">
+      <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password"/>
+      <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="Authenticator or recovery code" inputMode="numeric" autoComplete="one-time-code"/>
+      <div className="expert-form-actions"><button type="button" className="text-button" onClick={() => setDisabling(false)}>Cancel</button>
+        <button type="button" className="expert-submit danger" onClick={disable} disabled={busy || !password || !code.trim()}>{busy ? 'Turning off…' : 'Turn off two-step login'}</button></div>
+    </div>}
+    {!state.enabled && !setup && <>
+      <p className="expert-status">Protect your account with a code from an authenticator app (Google Authenticator, Authy, 1Password…) when you log in.</p>
+      <button type="button" className="text-button" onClick={start} disabled={busy}>{busy ? 'Starting…' : 'Set up two-step login'}</button>
+    </>}
+    {setup && <div className="two-factor-setup">
+      <img src={setup.qr} alt="QR code for your authenticator app" width="180" height="180"/>
+      <div className="expert-form">
+        <p className="expert-status">1. Scan this QR code in your authenticator app, or enter the key: <code className="secret-key">{setup.secret.match(/.{1,4}/g).join(' ')}</code></p>
+        <p className="expert-status">2. Type the 6-digit code it shows:</p>
+        <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="123456" inputMode="numeric" autoComplete="one-time-code" maxLength="7" className="otp-input"/>
+        <div className="expert-form-actions"><button type="button" className="text-button" onClick={() => { setSetup(null); setCode(''); }}>Cancel</button>
+          <button type="button" className="expert-submit" onClick={enable} disabled={busy || code.replace(/\D/g, '').length !== 6}>{busy ? 'Checking…' : 'Turn on'}</button></div>
+      </div>
+    </div>}
+    {error && <p className="auth-error" role="alert">{error}</p>}
   </fieldset>;
 }
