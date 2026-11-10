@@ -1,3 +1,4 @@
+import time
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -10,9 +11,11 @@ def healthz(request):
     """Liveness + database check for the hosting platform."""
 
     try:
+        started = time.perf_counter()
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
-        return JsonResponse({"status": "ok"})
+        # db_ms shows how far the app is from its database (same region: a few ms).
+        return JsonResponse({"status": "ok", "db_ms": round((time.perf_counter() - started) * 1000, 1)})
     except Exception:  # pragma: no cover - depends on the environment
         return JsonResponse({"status": "database unavailable"}, status=503)
 from rest_framework.routers import DefaultRouter

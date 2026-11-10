@@ -119,6 +119,21 @@ def _database_from_url(url):
     if "-pooler" in host or os.getenv("DB_POOLED") == "1":
         # PgBouncer in transaction mode can't keep server-side cursors open.
         config["DISABLE_SERVER_SIDE_CURSORS"] = True
+    if os.getenv("DB_POOL", "1") == "1" and os.getenv("DB_DIRECT") != "1":
+        # Under ASGI (daphne) every request runs on a fresh thread, so
+        # CONN_MAX_AGE never reuses anything and each request paid a full
+        # TCP + TLS + auth handshake to Neon (~2s on Render). An in-process
+        # psycopg pool keeps connections warm across threads instead.
+        # Django itself passes check=ConnectionPool.check_connection, so each
+        # connection is verified before use (Neon drops idle ones on suspend).
+        config["CONN_MAX_AGE"] = 0  # required by Django when pooling
+        config["CONN_HEALTH_CHECKS"] = False
+        config["OPTIONS"]["pool"] = {
+            "min_size": int(os.getenv("DB_POOL_MIN", "2")),
+            "max_size": int(os.getenv("DB_POOL_MAX", "10")),
+            "timeout": 10,
+            "max_idle": 240,  # recycle idle connections before Neon closes them
+        }
     return config
 
 
