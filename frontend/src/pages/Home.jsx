@@ -5,6 +5,7 @@ import { useInfiniteList } from '../hooks';
 import { PostCard } from '../components/PostCard';
 import { FollowButton, PeopleModal } from '../components/Sheets';
 import { StoryTray, StoryViewer } from '../components/Stories';
+import { PostSkeleton, Spinner } from '../components/Skeleton';
 
 export function HomePage({ createdPost, storiesVersion }) {
   const { currentUser, openProfile, openCreate, navigate, logoutUser } = useApp();
@@ -29,14 +30,14 @@ export function HomePage({ createdPost, storiesVersion }) {
   return <>
     <div className="feed-column">
       <StoryTray groups={stories} onOpen={setViewerIndex}/>
-      {feed.items === null && <div className="feed-skeleton"><div/><div/></div>}
+      {feed.items === null && <><PostSkeleton/><PostSkeleton/></>}
       {feed.items !== null && !posts.length && !feed.error && <div className="empty-state">
         <b>Welcome to Infogram</b><p>Follow creators to fill your feed with useful posts, or share your first one.</p>
         <div><button onClick={() => navigate('Explore')}>Explore creators</button><button onClick={() => openCreate('post')}>Create a post</button></div>
       </div>}
       {posts.map((post) => <PostCard key={post.id} post={post} onHidden={dropPost} onDeleted={dropPost} onCommentAdded={bumpComments}/>)}
       {feed.error && <div className="empty-state"><p>{feed.error}</p><button onClick={feed.reload}>Try again</button></div>}
-      <div ref={feed.sentinelRef} className="scroll-sentinel">{feed.loading && feed.items !== null ? 'Loading more…' : posts.length > 0 && !feed.next ? "You're all caught up" : ''}</div>
+      <div ref={feed.sentinelRef} className="scroll-sentinel">{feed.loading && feed.items !== null ? <Spinner/> : posts.length > 0 && !feed.next ? "You're all caught up" : ''}</div>
     </div>
     <aside className="right-rail">
       {currentUser && <div className="account-row">

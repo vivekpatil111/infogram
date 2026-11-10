@@ -3,6 +3,7 @@ import { fetchReelsPage } from '../api';
 import { useApp } from '../context';
 import { useInfiniteList } from '../hooks';
 import { ReelCard } from '../components/ReelCard';
+import { Spinner } from '../components/Skeleton';
 
 export function ReelsPage() {
   const { openCreate } = useApp();
@@ -23,7 +24,7 @@ export function ReelsPage() {
       </div>}
       {items.map((reel) => <ReelCard key={reel.id} reel={reel} onHidden={drop}/>)}
       {reels.error && <div className="empty-state"><p>{reels.error}</p><button onClick={reels.reload}>Try again</button></div>}
-      <div ref={reels.sentinelRef} className="scroll-sentinel">{reels.loading && reels.items !== null ? 'Loading more…' : ''}</div>
+      <div ref={reels.sentinelRef} className="scroll-sentinel">{reels.loading && reels.items !== null ? <Spinner/> : ''}</div>
     </div>
   </section>;
 }

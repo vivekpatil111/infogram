@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send } from 'lucide-react';
+import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send, Volume2, VolumeX } from 'lucide-react';
 import { formatCount, postLink } from '../api';
 import { useApp } from '../context';
 import { usePostEngagement } from './postActions';
@@ -10,6 +10,10 @@ export function ReelCard({ reel, onHidden }) {
   const { liked, likeCount, saved, toggleLike, toggleSave } = usePostEngagement(reel);
   const videoRef = useRef(null);
   const [muted, setMuted] = useState(true);
+  const [flash, setFlash] = useState(0);
+  const [burst, setBurst] = useState(0);
+  const toggleMute = () => { setMuted((current) => !current); setFlash((value) => value + 1); };
+  const doubleTapLike = () => { toggleLike(true); setBurst((value) => value + 1); };
   const [commentCount, setCommentCount] = useState(reel.commentCount);
   useEffect(() => {
     const video = videoRef.current;
@@ -29,9 +33,11 @@ export function ReelCard({ reel, onHidden }) {
     { label: 'Copy link', onClick: () => { navigator.clipboard?.writeText(postLink(reel.id)); showToast('Link copied'); } },
   ]);
   return <article className="reel-card">
-    <video ref={videoRef} className="reel-video" src={reel.image} poster={reel.poster || undefined} muted={muted} loop playsInline preload="metadata" onClick={() => setMuted((current) => !current)} onDoubleClick={() => toggleLike(true)}/>
+    <video ref={videoRef} className="reel-video" src={reel.image} poster={reel.poster || undefined} muted={muted} loop playsInline preload="metadata" onClick={toggleMute} onDoubleClick={doubleTapLike}/>
     <div className="reel-shade"/>
-    <div className="reel-topline"><span>Reels</span><button onClick={() => setMuted((current) => !current)} aria-label={muted ? 'Unmute reel' : 'Mute reel'}>{muted ? '🔇' : '🔊'}</button></div>
+    <div className="reel-topline"><span/><button onClick={toggleMute} aria-label={muted ? 'Unmute reel' : 'Mute reel'}>{muted ? <VolumeX/> : <Volume2/>}</button></div>
+    {flash > 0 && <span key={flash} className="reel-flash" aria-hidden="true">{muted ? <VolumeX/> : <Volume2/>}</span>}
+    {burst > 0 && <Heart key={`b${burst}`} className="like-burst" fill="currentColor"/>}
     <div className="reel-copy">
       {reel.place && <span className="reel-topic">{reel.place}</span>}
       <div className="reel-profile">

@@ -3,6 +3,7 @@ import { ChevronRight, Link2, Search, Send, X } from 'lucide-react';
 import { REPORT_REASONS, createConversation, fetchFollowList, postLink, reportContent, searchContent, sendConversationMessage } from '../api';
 import { useApp } from '../context';
 import { useDebounced } from '../hooks';
+import { ListSkeleton } from './Skeleton';
 
 const stop = (event) => event.stopPropagation();
 export const followLabel = (status) => (status === 'requested' ? 'Requested' : status === 'following' ? 'Following' : 'Follow');
@@ -92,7 +93,7 @@ export function PeopleModal({ title, load, emptyText, renderAction, onClose }) {
     <header><b>{title}</b><button onClick={onClose} aria-label="Close"><X/></button></header>
     {(people?.length || 0) > 8 && <div className="new-message-search"><Search/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search"/></div>}
     <div className="new-message-results">
-      {people === null && <p className="new-message-status">Loading…</p>}
+      {people === null && <ListSkeleton rows={4}/>}
       {error && <p className="new-message-status">{error}</p>}
       {visible.map((person) => <PersonRow key={person.name} person={person} onOpen={(name) => { onClose(); openProfile(name); }}
         action={renderAction ? renderAction(person, { remove }) : <FollowButton name={person.name} initialStatus={person.followStatus}/>}/>)}
@@ -163,7 +164,7 @@ export function ShareSheet({ post, onClose }) {
     <header><b>Share</b><button onClick={onClose} aria-label="Close share dialog"><X/></button></header>
     <div className="share-search"><Search/><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search people"/></div>
     <div className="share-people">
-      {people === null && <p className="no-results">Loading…</p>}
+      {people === null && <ListSkeleton rows={5}/>}
       {(people || []).map((person) => <div className="share-person" key={person.name}>
         <img src={person.avatar} alt=""/><span><b>{person.name}</b><small>{person.bio || 'Send as a message'}</small></span>
         <button className={sent[person.name] ? 'sent' : ''} onClick={() => send(person)} disabled={busy[person.name]}>{busy[person.name] ? 'Sending…' : sent[person.name] ? 'Sent' : 'Send'}</button>

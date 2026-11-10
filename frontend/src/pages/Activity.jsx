@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { acceptFollowRequest, declineFollowRequest, fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../api';
 import { useApp } from '../context';
+import { ListSkeleton } from '../components/Skeleton';
 
 const FILTERS = [['all', 'All'], ['follows', 'Follows'], ['requests', 'Requests']];
 
@@ -56,7 +57,7 @@ export function ActivityPage() {
     <header className="activity-header"><h1>Activity</h1>{items?.some((item) => item.unread) && <button onClick={markAll}>Mark all as read</button>}</header>
     <div className="activity-filters">{FILTERS.map(([key, label]) => <button key={key} className={filter === key ? 'active-activity-filter' : ''} onClick={() => setFilter(key)}>{label}{key === 'requests' && requestCount > 0 ? ` (${requestCount})` : ''}</button>)}</div>
     <section className="activity-list">
-      {items === null && <p className="new-message-status">Loading…</p>}
+      {items === null && <ListSkeleton rows={6}/>}
       {items !== null && !filtered.length && <div className="empty-state compact"><b>{filter === 'requests' ? 'No follow requests' : 'No activity yet'}</b><p>When people like, comment on or save your posts, or follow you, you'll see it here.</p></div>}
       {['New', 'Today', 'This week', 'Earlier'].filter((key) => groups[key]).map((key) => <React.Fragment key={key}>
         <h2>{key}</h2>

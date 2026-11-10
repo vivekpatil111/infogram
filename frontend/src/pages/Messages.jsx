@@ -6,6 +6,7 @@ import {
 } from '../api';
 import { useApp } from '../context';
 import { NewMessageModal } from '../components/Sheets';
+import { ListSkeleton, Spinner } from '../components/Skeleton';
 
 const POST_LINK = /https?:\/\/[^\s]+\/post\/(\d+)/;
 const IMAGE_URL = /^https?:\/\/\S+\.(jpe?g|png|webp)(\?\S*)?$/i;
@@ -117,7 +118,7 @@ export function MessagesPage({ target, onTargetHandled, unreadMessages }) {
       <header><h1>Messages</h1><button aria-label="New message" onClick={() => setNewMessageOpen(true)}><PenSquare/></button></header>
       <div className="message-search"><Search/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search messages"/></div>
       <div className="conversation-list">
-        {conversations === null && <p className="new-message-status">Loading…</p>}
+        {conversations === null && <ListSkeleton rows={6}/>}
         {conversations?.length === 0 && <div className="empty-state compact"><b>No messages yet</b><p>Start a conversation with someone you follow.</p><button onClick={() => setNewMessageOpen(true)}>Send message</button></div>}
         {visible.map((conversation) => <button key={conversation.id} className={`conversation ${conversation.id === activeId ? 'active-conversation' : ''} ${conversation.unreadCount ? 'unread' : ''}`}
           onClick={() => { setActiveId(conversation.id); setMobileChatOpen(true); }}>
@@ -136,7 +137,7 @@ export function MessagesPage({ target, onTargetHandled, unreadMessages }) {
           {!isGroup && <div><button aria-label="Conversation options" onClick={chatMenu}><MoreHorizontal/></button></div>}
         </header>
         <div className="chat-messages">
-          {!active.loaded && <p className="new-message-status">Loading…</p>}
+          {!active.loaded && <div className="center-spinner"><Spinner/></div>}
           {active.loaded && !active.messages.length && <p className="new-message-status">Say hi to {active.name} 👋</p>}
           {active.messages.map((message, index) => <div className={`message-row ${message.from === 'me' ? 'mine' : ''}`} key={message.id || index}>
             <p><MessageBody text={message.text} onOpenPost={(id) => openPost(id)}/><small>{message.time}</small></p>

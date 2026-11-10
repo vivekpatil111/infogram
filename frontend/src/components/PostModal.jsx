@@ -5,6 +5,7 @@ import { useApp } from '../context';
 import { Caption, MediaView } from './Media';
 import { usePostEngagement, usePostMenu } from './postActions';
 import { FollowButton } from './Sheets';
+import { ListSkeleton, Spinner } from './Skeleton';
 
 // Post detail: media, caption and the full comment thread.
 export function PostModal({ postOrId, onClose, onCommentAdded, onDeleted }) {
@@ -18,7 +19,7 @@ export function PostModal({ postOrId, onClose, onCommentAdded, onDeleted }) {
     <button className="post-modal-close" onClick={onClose} aria-label="Close"><X/></button>
     <section className="post-modal" onClick={(event) => event.stopPropagation()}>
       {post ? <PostDetail post={post} onClose={onClose} onCommentAdded={onCommentAdded} onDeleted={onDeleted}/>
-        : <p className="post-modal-status">{error || 'Loading…'}</p>}
+        : <p className="post-modal-status">{error || <Spinner/>}</p>}
     </section>
   </div>;
 }
@@ -61,7 +62,7 @@ function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
       </header>
       <div className="post-modal-comments">
         {post.caption && <div className="comment"><img src={post.avatar} alt=""/><p><b>{post.name}</b> <Caption text={post.caption} onHashtag={(tag) => { onClose(); navigate('Explore', { topic: `#${tag}` }); }}/><span>{post.time}</span></p></div>}
-        {comments === null && <p className="empty-comments">Loading comments…</p>}
+        {comments === null && <ListSkeleton rows={3}/>}
         {comments?.map((comment) => <div className="comment" key={comment.id}>
           <button className="avatar-button" onClick={() => goProfile(comment.name)}><img src={comment.avatar} alt=""/></button>
           <p><b role="button" tabIndex={0} onClick={() => goProfile(comment.name)}>{comment.name}</b> {comment.text}
