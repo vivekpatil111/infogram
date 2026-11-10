@@ -7,9 +7,9 @@ from rest_framework.response import Response
 from notifications.services import create_notification, remove_notification
 from safety.querysets import blocked_by_me, not_blocked_q
 
-from .models import Comment, PostLike, PostSave
+from .models import Comment, CommentLike, PostLike, PostSave
 from .pagination import PostCursorPagination
-from .querysets import posts_for_user
+from .querysets import comments_with_stats, posts_for_user
 from .serializers import CommentSerializer, PostSerializer
 
 
@@ -34,7 +34,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         # Engagement endpoints are allowed on anyone's post.
-        if self.action in {"like", "save", "comments", "delete_comment"}:
+        if self.action in {"like", "save", "comments", "delete_comment", "like_comment", "likers"}:
             return [permissions.IsAuthenticated()]
         return super().get_permissions()
 
@@ -90,17 +90,44 @@ class PostViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get", "post"], url_path="comments")
     def comments(self, request, pk=None):
+        """GET: top-level comments, or ?parent=<id> for that comment's replies.
+        POST: {text, parent_id?}. Replying to a reply attaches to its parent."""
+
         post = self.get_object()
         if request.method == "GET":
             paginator = CommentCursorPagination()
-            comments = Comment.objects.filter(post=post).filter(not_blocked_q(request.user)).select_related("author")
+            comments = comments_with_stats(request.user).filter(post=post)
+            parent = request.query_params.get("parent")
+            comments = comments.filter(parent_id=int(parent)) if parent and parent.isdigit() else comments.filter(parent__isnull=True)
             page = paginator.paginate_queryset(comments, request, view=self)
             return paginator.get_paginated_response(CommentSerializer(page, many=True).data)
         serializer = CommentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        comment = serializer.save(post=post, author=request.user)
+        parent = None
+        parent_id = request.data.get("parent_id")
+        if parent_id not in (None, ""):
+            parent = Comment.objects.filter(pk=parent_id, post=post).select_related("parent", "author").first()
+            if parent is None:
+                return Response({"parent_id": ["That comment doesn't exist on this post."]}, status=status.HTTP_400_BAD_REQUEST)
+            parent = parent.parent or parent
+        comment = serializer.save(post=post, author=request.user, parent=parent)
         create_notification(recipient=post.author, actor=request.user, notification_type="comment", post=post, comment=comment)
-        return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
+        if parent and parent.author_id != post.author_id:
+            create_notification(recipient=parent.author, actor=request.user, notification_type="reply", post=post, comment=comment)
+        return Response(CommentSerializer(comments_with_stats(request.user).get(pk=comment.pk)).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post", "delete"], url_path=r"comments/(?P<comment_id>\d+)/like")
+    def like_comment(self, request, pk=None, comment_id=None):
+        post = self.get_object()
+        comment = get_object_or_404(Comment.objects.filter(not_blocked_q(request.user)), pk=comment_id, post=post)
+        if request.method == "POST":
+            _, created = CommentLike.objects.get_or_create(comment=comment, user=request.user)
+            if created:
+                create_notification(recipient=comment.author, actor=request.user, notification_type="comment_like", post=post, comment=comment)
+        else:
+            if CommentLike.objects.filter(comment=comment, user=request.user).delete()[0]:
+                remove_notification(recipient=comment.author, actor=request.user, notification_type="comment_like", post=post, comment=comment)
+        return Response({"liked": request.method == "POST", "like_count": comment.likes.count()})
 
     @action(detail=True, methods=["delete"], url_path=r"comments/(?P<comment_id>\d+)")
     def delete_comment(self, request, pk=None, comment_id=None):

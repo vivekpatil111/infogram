@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send, X } from 'lucide-react';
-import { addPostComment, deleteComment, fetchComments, fetchPost, formatCount } from '../api';
+import { addPostComment, deleteComment, fetchComments, fetchPost, formatCount, setCommentLike } from '../api';
 import { useApp } from '../context';
 import { Caption, MediaView } from './Media';
 import { usePostEngagement, usePostMenu } from './postActions';
@@ -32,6 +32,8 @@ function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
   const [comments, setComments] = useState(null);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [replyTo, setReplyTo] = useState(null); // { id: top-level comment id, name }
+  const [replies, setReplies] = useState({}); // parentId -> comment[] once opened
   const inputRef = useRef(null);
   useEffect(() => { fetchComments(post.id).then(setComments).catch(() => setComments([])); }, [post.id]);
   const goProfile = (name) => { onClose(); openProfile(name); };
@@ -41,16 +43,69 @@ function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
     if (!body || busy) return;
     setBusy(true);
     try {
-      const comment = await addPostComment(post.id, body);
-      setComments((current) => [...(current || []), comment]);
+      const comment = await addPostComment(post.id, body, replyTo?.id);
+      if (comment.parentId) {
+        // Show the new reply under its parent, opening the thread if needed.
+        const existing = replies[comment.parentId] || await fetchComments(post.id, comment.parentId).catch(() => []);
+        setReplies((current) => ({ ...current, [comment.parentId]: [...existing.filter((item) => item.id !== comment.id), comment] }));
+        setComments((current) => current.map((item) => (item.id === comment.parentId ? { ...item, replyCount: item.replyCount + 1 } : item)));
+      } else {
+        setComments((current) => [...(current || []), comment]);
+      }
       setText('');
+      setReplyTo(null);
       onCommentAdded?.(post.id);
     } catch (error) { showToast(`Comment: ${error.message}`); } finally { setBusy(false); }
   };
   const remove = async (comment) => {
-    try { await deleteComment(post.id, comment.id); setComments((current) => current.filter((item) => item.id !== comment.id)); } catch (error) { showToast(`Delete: ${error.message}`); }
+    try {
+      await deleteComment(post.id, comment.id);
+      if (comment.parentId) {
+        setReplies((current) => ({ ...current, [comment.parentId]: current[comment.parentId].filter((item) => item.id !== comment.id) }));
+        setComments((current) => current.map((item) => (item.id === comment.parentId ? { ...item, replyCount: Math.max(0, item.replyCount - 1) } : item)));
+      } else setComments((current) => current.filter((item) => item.id !== comment.id));
+    } catch (error) { showToast(`Delete: ${error.message}`); }
   };
-  const reply = (name) => { setText(`@${name} `); inputRef.current?.focus(); };
+  const reply = (comment) => {
+    setReplyTo({ id: comment.parentId || comment.id, name: comment.name });
+    setText(`@${comment.name} `);
+    inputRef.current?.focus();
+  };
+  const toggleReplies = async (comment) => {
+    if (replies[comment.id]) { setReplies(({ [comment.id]: _closed, ...rest }) => rest); return; }
+    setReplies((current) => ({ ...current, [comment.id]: null }));
+    try {
+      const rows = await fetchComments(post.id, comment.id);
+      setReplies((current) => ({ ...current, [comment.id]: rows }));
+    } catch (error) { showToast(`Replies: ${error.message}`); setReplies(({ [comment.id]: _failed, ...rest }) => rest); }
+  };
+  // Optimistic heart on a comment or reply.
+  const patchComment = (comment, change) => {
+    if (comment.parentId) setReplies((current) => ({ ...current, [comment.parentId]: current[comment.parentId].map((item) => (item.id === comment.id ? { ...item, ...change } : item)) }));
+    else setComments((current) => current.map((item) => (item.id === comment.id ? { ...item, ...change } : item)));
+  };
+  const likeComment = async (comment) => {
+    const next = !comment.likedByMe;
+    patchComment(comment, { likedByMe: next, likeCount: comment.likeCount + (next ? 1 : -1) });
+    try { await setCommentLike(post.id, comment.id, next); } catch (error) {
+      patchComment(comment, { likedByMe: !next, likeCount: comment.likeCount });
+      showToast(`Like: ${error.message}`);
+    }
+  };
+  const renderComment = (comment) => <div className={`comment ${comment.parentId ? 'is-reply' : ''}`} key={comment.id}>
+    <button className="avatar-button" onClick={() => goProfile(comment.name)}><img src={comment.avatar} alt=""/></button>
+    <p><b role="button" tabIndex={0} onClick={() => goProfile(comment.name)}>{comment.name}</b> {comment.text}
+      <span>{comment.time}
+        {comment.likeCount > 0 && <span className="comment-likes">{comment.likeCount} {comment.likeCount === 1 ? 'like' : 'likes'}</span>}
+        <button className="comment-action" onClick={() => reply(comment)}>Reply</button>
+        {comment.authorId !== currentUser?.id && <button className="comment-action" onClick={() => openReport({ type: 'comment', id: comment.id, name: comment.name })}>Report</button>}
+        {(comment.authorId === currentUser?.id || ownPost) && <button className="comment-action danger" onClick={() => remove(comment)}>Delete</button>}
+      </span>
+    </p>
+    <button className={`comment-like ${comment.likedByMe ? 'liked' : ''}`} onClick={() => likeComment(comment)} aria-label={comment.likedByMe ? 'Unlike comment' : 'Like comment'}>
+      <Heart fill={comment.likedByMe ? 'currentColor' : 'none'}/>
+    </button>
+  </div>;
   const ownPost = post.authorId === currentUser?.id;
   return <>
     <div className="post-modal-media"><MediaView post={post} className="post-modal-image" onDoubleTap={() => toggleLike(true)}/></div>
@@ -64,16 +119,14 @@ function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
       <div className="post-modal-comments">
         {post.caption && <div className="comment"><img src={post.avatar} alt=""/><p><b>{post.name}</b> <Caption text={post.caption} onHashtag={(tag) => { onClose(); navigate('Explore', { topic: `#${tag}` }); }}/><span>{post.time}</span></p></div>}
         {comments === null && <ListSkeleton rows={3}/>}
-        {comments?.map((comment) => <div className="comment" key={comment.id}>
-          <button className="avatar-button" onClick={() => goProfile(comment.name)}><img src={comment.avatar} alt=""/></button>
-          <p><b role="button" tabIndex={0} onClick={() => goProfile(comment.name)}>{comment.name}</b> {comment.text}
-            <span>{comment.time}
-              <button className="comment-action" onClick={() => reply(comment.name)}>Reply</button>
-              {comment.authorId !== currentUser?.id && <button className="comment-action" onClick={() => openReport({ type: 'comment', id: comment.id, name: comment.name })}>Report</button>}
-              {(comment.authorId === currentUser?.id || ownPost) && <button className="comment-action danger" onClick={() => remove(comment)}>Delete</button>}
-            </span>
-          </p>
-        </div>)}
+        {comments?.map((comment) => <React.Fragment key={comment.id}>
+          {renderComment(comment)}
+          {comment.replyCount > 0 && <button className="view-replies" onClick={() => toggleReplies(comment)}>
+            <i/>{replies[comment.id] ? 'Hide replies' : `View replies (${comment.replyCount})`}
+          </button>}
+          {replies[comment.id] === null && <div className="replies"><ListSkeleton rows={1}/></div>}
+          {replies[comment.id] && <div className="replies">{replies[comment.id].map(renderComment)}</div>}
+        </React.Fragment>)}
         {comments?.length === 0 && !post.caption && <p className="empty-comments">No comments yet. Start the conversation.</p>}
       </div>
       <div className="post-actions">
@@ -85,6 +138,7 @@ function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
         <button onClick={toggleSave} className={saved ? 'saved' : ''} aria-label={saved ? 'Remove from saved' : 'Save'}><Bookmark fill={saved ? 'currentColor' : 'none'}/></button>
       </div>
       <div className="post-copy">{likeCount > 0 ? <button className="like-count" onClick={() => openLikes(post.id)}>{formatCount(likeCount)} {likeCount === 1 ? 'like' : 'likes'}</button> : <span className="like-count muted-text">Be the first to like this</span>}<span className="timestamp">{post.time}</span></div>
+      {replyTo && <div className="replying-to">Replying to <b>{replyTo.name}</b><button type="button" onClick={() => { setReplyTo(null); setText(''); }} aria-label="Cancel reply"><X/></button></div>}
       <form className="comment-form" onSubmit={submit}>
         <EmojiButton onPick={(emoji) => insertAtCaret(inputRef.current, text, emoji, setText)}/>
         <input ref={inputRef} value={text} onChange={(event) => setText(event.target.value)} placeholder="Add a comment…" aria-label="Add a comment" maxLength="2200"/>

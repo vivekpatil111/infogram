@@ -257,3 +257,25 @@ span.like-count { font-weight: 500; font-size: 13px; }
 .about-body dd { margin: 0; font-weight: 600; }
 .about-body > button { border: 0; background: #efefef; border-radius: 8px; padding: 9px 18px; font-weight: 600; font-size: 14px; }
 .about-body > button:hover { background: #dbdbdb; }
+
+/* ---- comment threads + comment likes -------------------------------------- */
+.comment { position: relative; }
+.comment > p { flex: 1; min-width: 0; padding-right: 26px; }
+.comment-like { position: absolute; right: 0; top: 6px; border: 0; background: none; padding: 4px; color: #262626; display: grid; place-items: center; }
+.comment-like svg { width: 12px; height: 12px; stroke-width: 2; }
+.comment-like:hover svg { opacity: .55; }
+.comment-like.liked { color: #ff3040; }
+.comment-like.liked svg { animation: heart-pop .4s var(--ease-spring); opacity: 1; }
+.comment-likes { font-weight: 600; margin-left: 10px; color: #737373; }
+.view-replies { display: flex; align-items: center; gap: 12px; border: 0; background: none; padding: 2px 0 10px 54px; color: #737373; font-size: 12px; font-weight: 600; }
+.view-replies i { width: 24px; height: 1px; background: #c7c7c7; display: inline-block; }
+.view-replies:hover { color: #262626; }
+.replies { padding-left: 42px; animation: rise-in .25s var(--ease-out); }
+.comment.is-reply img { width: 26px; height: 26px; }
+.replying-to { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 16px; background: #fafafa; border-top: 1px solid #efefef; color: #737373; font-size: 12px; animation: slide-up .2s var(--ease-out); }
+.replying-to b { color: #262626; }
+.replying-to button { border: 0; background: none; padding: 2px; display: grid; place-items: center; color: #737373; margin-left: auto; }
+.replying-to svg { width: 14px; height: 14px; }
+.comment p span .comment-likes { display: inline; margin-top: 0; }
+.comment-form .emoji-toggle { color: #262626; }
+.post-modal-media .media-frame { background: #000; }

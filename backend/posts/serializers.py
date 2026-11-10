@@ -156,11 +156,15 @@ class PostSerializer(serializers.ModelSerializer):
 
 class CommentSerializer(serializers.ModelSerializer):
     author = serializers.SerializerMethodField()
+    parent_id = serializers.IntegerField(read_only=True, allow_null=True)
+    like_count = serializers.IntegerField(read_only=True, default=0)
+    reply_count = serializers.IntegerField(read_only=True, default=0)
+    liked_by_me = serializers.BooleanField(read_only=True, default=False)
 
     class Meta:
         model = Comment
-        fields = ["id", "author", "text", "created_at"]
-        read_only_fields = ["id", "author", "created_at"]
+        fields = ["id", "author", "text", "created_at", "parent_id", "like_count", "reply_count", "liked_by_me"]
+        read_only_fields = ["id", "author", "created_at", "parent_id", "like_count", "reply_count", "liked_by_me"]
 
     def get_author(self, comment):
         return author_summary(comment.author)

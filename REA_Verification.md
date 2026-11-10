@@ -46,6 +46,7 @@ menus). Module names only say a surface exists. They don't show how it is built.
 | Liked-by list (`PostLikedByListDialogRoot`) | ✅ **new**: `GET /posts/{id}/likers/` + Likes dialog | `posts/views.py`, `LikesModal` |
 | Caption "… more" | ✅ **new** | `PostCard.jsx` |
 | Comment box under each feed post (`PostCommentInput`) | ✅ **new**: inline comment in the feed | `PostCard.jsx` |
+| Comment replies and comment likes | ✅ **new**: one-level threads, "View replies (n)", heart on each comment | `posts/views.py`, `PostModal.jsx` |
 | Emoji picker (`EmojiPopover`) | ✅ **new**: comments (feed + post) and DMs | `components/Emoji.jsx` |
 | Post options popover (`PostOptionsPopover`) | ✅ | `postActions.js` |
 | About this account (`AboutThisAccountDialog`) | ✅ **new**: date joined, privacy, post count | `AboutAccountModal` |
@@ -73,6 +74,5 @@ menus). Module names only say a surface exists. They don't show how it is built.
 
 ## Not built yet (next steps)
 
-Impression ("seen") tracking for "You're all caught up", comment replies and
-comment likes, locations, profile links, story stickers, two-factor login, and
+Impression ("seen") tracking for "You're all caught up", locations, profile links, story stickers, two-factor login, and
 HLS transcoding. (Blocking and muting have shipped: `safety/`.)

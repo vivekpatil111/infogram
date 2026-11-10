@@ -12,6 +12,8 @@ class Notification(models.Model):
         SAVE = "save", "Save"
         FOLLOW_REQUEST = "follow_request", "Follow request"
         FOLLOW_ACCEPT = "follow_accept", "Follow request accepted"
+        COMMENT_LIKE = "comment_like", "Comment like"
+        REPLY = "reply", "Reply"
 
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_notifications")

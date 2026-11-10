@@ -241,3 +241,54 @@ class LikersTests(InfogramAPITestCase):
         names = [row["username"] for row in response.data["results"]]
         self.assertEqual(sorted(names), ["fan", "other"])
         self.assertIn("follow_status", response.data["results"][0])
+
+
+class CommentThreadTests(InfogramAPITestCase):
+    def setUp(self):
+        super().setUp()
+        self.owner = self.make_user("owner")
+        self.alice = self.make_user("alice")
+        self.bob = self.make_user("bob")
+        self.post = self.make_post(self.owner)
+        self.url = f"/api/v1/posts/{self.post.id}/comments/"
+
+    def test_replies_nest_one_level_and_are_listed_separately(self):
+        top = self.as_user(self.alice).post(self.url, {"text": "Great tip"}, format="json").data
+        reply = self.as_user(self.bob).post(self.url, {"text": "Agreed", "parent_id": top["id"]}, format="json").data
+        self.assertEqual(reply["parent_id"], top["id"])
+        # Replying to a reply attaches to the top-level comment.
+        nested = self.as_user(self.alice).post(self.url, {"text": "@bob thanks", "parent_id": reply["id"]}, format="json").data
+        self.assertEqual(nested["parent_id"], top["id"])
+
+        listing = self.as_user(self.owner).get(self.url).data["results"]
+        self.assertEqual([row["id"] for row in listing], [top["id"]])
+        self.assertEqual(listing[0]["reply_count"], 2)
+        replies = self.as_user(self.owner).get(self.url, {"parent": top["id"]}).data["results"]
+        self.assertEqual([row["text"] for row in replies], ["Agreed", "@bob thanks"])
+
+    def test_reply_notifies_the_parent_author_and_rejects_foreign_parent(self):
+        top = self.as_user(self.alice).post(self.url, {"text": "Question?"}, format="json").data
+        self.as_user(self.bob).post(self.url, {"text": "Answer", "parent_id": top["id"]}, format="json")
+        self.assertTrue(Notification.objects.filter(recipient=self.alice, actor=self.bob, notification_type="reply").exists())
+        other_post = self.make_post(self.owner)
+        foreign = self.as_user(self.alice).post(f"/api/v1/posts/{other_post.id}/comments/", {"text": "x"}, format="json").data
+        response = self.as_user(self.bob).post(self.url, {"text": "y", "parent_id": foreign["id"]}, format="json")
+        self.assertEqual(response.status_code, 400)
+
+    def test_comment_like_counts_notifies_and_undoes(self):
+        top = self.as_user(self.alice).post(self.url, {"text": "Like me"}, format="json").data
+        like_url = f"{self.url}{top['id']}/like/"
+        response = self.as_user(self.bob).post(like_url)
+        self.assertEqual(response.data, {"liked": True, "like_count": 1})
+        row = self.as_user(self.bob).get(self.url).data["results"][0]
+        self.assertEqual((row["like_count"], row["liked_by_me"]), (1, True))
+        self.assertTrue(Notification.objects.filter(recipient=self.alice, notification_type="comment_like").exists())
+        self.as_user(self.bob).delete(like_url)
+        self.assertFalse(Notification.objects.filter(recipient=self.alice, notification_type="comment_like").exists())
+        self.assertEqual(self.as_user(self.bob).get(self.url).data["results"][0]["like_count"], 0)
+
+    def test_deleting_a_comment_removes_its_replies(self):
+        top = self.as_user(self.alice).post(self.url, {"text": "Parent"}, format="json").data
+        self.as_user(self.bob).post(self.url, {"text": "Child", "parent_id": top["id"]}, format="json")
+        self.as_user(self.alice).delete(f"{self.url}{top['id']}/")
+        self.assertFalse(Comment.objects.filter(post=self.post).exists())

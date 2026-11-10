@@ -4,7 +4,7 @@ from accounts.models import Follow
 from accounts.querysets import count_subquery, visible_author_q
 from safety.querysets import not_blocked_q
 
-from .models import Comment, Post, PostLike, PostMedia, PostSave
+from .models import Comment, CommentLike, Post, PostLike, PostMedia, PostSave
 
 
 def posts_for_user(user):
@@ -31,5 +31,19 @@ def posts_for_user(user):
             author_follow_status=Subquery(
                 Follow.objects.filter(follower=user, following=OuterRef("author_id")).values("status")[:1]
             ),
+        )
+    )
+
+
+def comments_with_stats(viewer):
+    """Comments the viewer may see, with like/reply counts and liked_by_me."""
+
+    return (
+        Comment.objects.filter(not_blocked_q(viewer))
+        .select_related("author")
+        .annotate(
+            like_count=count_subquery(CommentLike.objects.filter(comment=OuterRef("pk")), "comment"),
+            reply_count=count_subquery(Comment.objects.filter(parent=OuterRef("pk")).filter(not_blocked_q(viewer)), "parent"),
+            liked_by_me=Exists(CommentLike.objects.filter(comment=OuterRef("pk"), user=viewer)),
         )
     )

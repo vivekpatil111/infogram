@@ -16,12 +16,10 @@ def create_notification(*, recipient, actor, notification_type, post=None, comme
     return notification
 
 
-def remove_notification(*, recipient, actor, notification_type, post=None):
+def remove_notification(*, recipient, actor, notification_type, post=None, comment=None):
     """Undo an activity item when its action is reversed (unlike, unfollow...)."""
 
-    Notification.objects.filter(
-        recipient=recipient,
-        actor=actor,
-        notification_type=notification_type,
-        post=post,
-    ).delete()
+    items = Notification.objects.filter(recipient=recipient, actor=actor, notification_type=notification_type, post=post)
+    if comment is not None:
+        items = items.filter(comment=comment)
+    items.delete()

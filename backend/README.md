@@ -62,9 +62,11 @@ Without storage credentials, presign falls back to an authenticated local upload
 
 - `POST/DELETE /api/v1/posts/{id}/like/` toggles the current user's like.
 - `POST/DELETE /api/v1/posts/{id}/save/` toggles the current user's saved state.
-- `GET /api/v1/posts/{id}/comments/` lists comments (cursor-paginated, oldest first).
-- `POST /api/v1/posts/{id}/comments/` creates a comment.
-- `DELETE /api/v1/posts/{id}/comments/{comment_id}/` deletes a comment (its author or the post owner).
+- `GET /api/v1/posts/{id}/comments/` lists top-level comments (cursor-paginated, oldest first); `?parent={comment_id}` lists that comment's replies. Each comment has `parent_id`, `reply_count`, `like_count` and `liked_by_me`.
+- `POST /api/v1/posts/{id}/comments/` creates a comment; `{"text", "parent_id"}` makes it a reply. Threads are one level deep: replying to a reply attaches to its top-level comment. The replied-to author gets a `reply` notification.
+- `POST/DELETE /api/v1/posts/{id}/comments/{comment_id}/like/` likes or unlikes a comment (`comment_like` notification, removed on unlike).
+- `GET /api/v1/posts/{id}/likers/` lists who liked a post.
+- `DELETE /api/v1/posts/{id}/comments/{comment_id}/` deletes a comment and its replies (its author or the post owner).
 
 Undoing an action (unlike, unsave, unfollow, deleting a comment or post) removes its notification.
 

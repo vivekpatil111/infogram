@@ -168,6 +168,10 @@ export function normalizeComment(comment) {
     avatar: avatarOf(comment.author),
     text: comment.text,
     time: relativeTime(comment.created_at),
+    parentId: comment.parent_id || null,
+    likeCount: comment.like_count || 0,
+    replyCount: comment.reply_count || 0,
+    likedByMe: Boolean(comment.liked_by_me),
   };
 }
 
@@ -287,13 +291,17 @@ export async function fetchTopics() {
 export const setPostLike = (postId, liked) => apiRequest(`/posts/${postId}/like/`, { method: liked ? 'POST' : 'DELETE' });
 export const setPostSaved = (postId, saved) => apiRequest(`/posts/${postId}/save/`, { method: saved ? 'POST' : 'DELETE' });
 
-export async function fetchComments(postId) {
-  const response = await apiRequest(`/posts/${postId}/comments/?limit=100`);
+// Top-level comments, or the replies under one comment when parentId is given.
+export async function fetchComments(postId, parentId = null) {
+  const response = await apiRequest(`/posts/${postId}/comments/?limit=100${parentId ? `&parent=${parentId}` : ''}`);
   return response.results.map(normalizeComment);
 }
 
-export async function addPostComment(postId, text) {
-  return normalizeComment(await apiRequest(`/posts/${postId}/comments/`, { method: 'POST', body: JSON.stringify({ text }) }));
+export const setCommentLike = (postId, commentId, like) =>
+  apiRequest(`/posts/${postId}/comments/${commentId}/like/`, { method: like ? 'POST' : 'DELETE' });
+
+export async function addPostComment(postId, text, parentId = null) {
+  return normalizeComment(await apiRequest(`/posts/${postId}/comments/`, { method: 'POST', body: JSON.stringify(parentId ? { text, parent_id: parentId } : { text }) }));
 }
 
 export const deleteComment = (postId, commentId) => apiRequest(`/posts/${postId}/comments/${commentId}/`, { method: 'DELETE' });

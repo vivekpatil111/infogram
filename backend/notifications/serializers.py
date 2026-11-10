@@ -28,11 +28,17 @@ class NotificationSerializer(serializers.ModelSerializer):
         return post.thumbnail_url or (post.media_url if post.media_type != "video" else "")
 
     def get_text(self, notification):
-        if notification.notification_type == Notification.Type.COMMENT and notification.comment:
+        kind = notification.notification_type
+        if notification.comment and kind in {Notification.Type.COMMENT, Notification.Type.REPLY, Notification.Type.COMMENT_LIKE}:
             snippet = notification.comment.text
             if len(snippet) > 80:
                 snippet = f"{snippet[:77]}..."
-            return f"commented: {snippet}"
+            verb = {
+                Notification.Type.COMMENT: "commented",
+                Notification.Type.REPLY: "replied to your comment",
+                Notification.Type.COMMENT_LIKE: "liked your comment",
+            }[kind]
+            return f"{verb}: {snippet}"
         return {
             Notification.Type.LIKE: "liked your post.",
             Notification.Type.COMMENT: "commented on your post.",
@@ -40,4 +46,6 @@ class NotificationSerializer(serializers.ModelSerializer):
             Notification.Type.SAVE: "saved your post.",
             Notification.Type.FOLLOW_REQUEST: "requested to follow you.",
             Notification.Type.FOLLOW_ACCEPT: "accepted your follow request.",
+            Notification.Type.COMMENT_LIKE: "liked your comment.",
+            Notification.Type.REPLY: "replied to your comment.",
         }[notification.notification_type]
