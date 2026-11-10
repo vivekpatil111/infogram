@@ -69,6 +69,14 @@ Without storage credentials, presign falls back to an authenticated local upload
 - Posts take an optional `location` (a place name; `""` clears it) and return `location: {name, slug}` or `null`. Places are created on first use and shared by slug.
 - `GET /api/v1/locations/?q=` suggests places, most used first. `GET /api/v1/locations/{slug}/` returns `location: {name, slug, post_count}` plus that place's visible posts, newest first (cursor). `GET /search/` also returns `locations`.
 - `PATCH /api/v1/auth/me/` accepts `links`: up to 5 `{title?, url}`. Only http(s) URLs are allowed; a bare domain gets `https://`. Profiles return `links`.
+
+### Knowledge features
+
+- **Knowledge Verticals.** `GET /api/v1/verticals/` lists the fixed verticals (`slug, name, emoji, description, post_count, expert_count`). Posts take `vertical`; feed, reels and explore accept `?vertical=`.
+- **Expert verification.** `GET/POST /api/v1/auth/expert-application/` with `{vertical, title, evidence_url, note?}`. Staff approve or reject in Django admin (Expert applications), which sets `is_verified`, `expert_vertical` and `expert_title` on the user. Authors and profiles carry `is_verified` and `expert_title`. Users can't set these themselves.
+- **Utility Score and seen tracking.** `POST /api/v1/posts/seen/ {ids}` records first views. Posts include `seen_by_me`. Ranking is described in `Feed_Ranking_Notes.md`.
+- **Resource Drawer.** Posts take `resources`: up to 5 `{kind: link|pdf|checklist, title, url?, items?}`. PDFs upload through `/media/presign/` as `application/pdf` (20 MB max). `POST /api/v1/posts/{id}/resources/{rid}/open/` counts opens, and only the creator sees `open_count`.
+- **Learning Paths.** `GET /api/v1/paths/?creator=`, `POST /api/v1/paths/ {title, description?, vertical?, post_ids}` (your own published posts, in order, max 30), and `GET/PATCH/DELETE /api/v1/paths/{id}/`. Detail returns `lessons`, `progress {seen, total}` and `next_post_id`; for a private creator it returns `locked: true` until you follow them. Posts carry `paths: [{id, title, position, total}]`.
 - `DELETE /api/v1/posts/{id}/comments/{comment_id}/` deletes a comment and its replies (its author or the post owner).
 
 Undoing an action (unlike, unsave, unfollow, deleting a comment or post) removes its notification.

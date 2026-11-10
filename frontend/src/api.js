@@ -144,7 +144,13 @@ export function normalizePost(post) {
     name: post.author?.username || 'unknown',
     avatar: avatarOf(post.author),
     followStatus: post.author?.follow_status || 'none',
+    verified: Boolean(post.author?.is_verified),
+    expertTitle: post.author?.expert_title || '',
     place: post.topic || '',
+    vertical: post.vertical || '',
+    resources: post.resources || [],
+    paths: post.paths || [],
+    seenByMe: Boolean(post.seen_by_me),
     location: post.location || null, // { name, slug }
     image: post.media_url,
     poster: post.thumbnail_url || '',
@@ -194,6 +200,7 @@ const userRow = (user) => ({
   followStatus: user.follow_status || (user.is_following ? 'following' : user.is_requested ? 'requested' : 'none'),
   isPrivate: Boolean(user.is_private),
   joined: user.date_joined || null,
+  verified: Boolean(user.is_verified),
 });
 
 // ---------------------------------------------------------------------------
@@ -279,8 +286,11 @@ export async function fetchReelsPage(feed = 'for_you', next = null) {
   return { items: response.results.map(normalizePost), next: response.next };
 }
 
-export async function fetchExplorePage(topic = '', next = null) {
-  const query = topic ? `?topic=${encodeURIComponent(topic)}` : '';
+export async function fetchExplorePage(topic = '', next = null, vertical = '') {
+  const params = new URLSearchParams();
+  if (topic) params.set('topic', topic);
+  if (vertical) params.set('vertical', vertical);
+  const query = params.toString() ? `?${params}` : '';
   const response = await apiRequest(next ? pathFromNext(next) : `/explore/${query}`);
   return { items: response.results.map(normalizePost), next: response.next };
 }
@@ -509,3 +519,47 @@ export async function fetchBlockedAccounts() {
   const response = await apiRequest('/blocks/');
   return response.results.map((user) => ({ id: user.id, name: user.username, avatar: avatarOf(user), bio: 'Blocked', followers: 0, followStatus: 'none' }));
 }
+
+// ---------------------------------------------------------------------------
+// Knowledge features: verticals, seen tracking, resources, paths, experts
+// ---------------------------------------------------------------------------
+
+let verticalsPromise = null;
+// The fixed Knowledge Verticals, fetched once per session.
+export function fetchVerticals() {
+  verticalsPromise = verticalsPromise || apiRequest('/verticals/').then((response) => response.results).catch((error) => { verticalsPromise = null; throw error; });
+  return verticalsPromise;
+}
+
+// Posts that were really on screen, sent in small batches (first view counts).
+const seenQueue = new Set();
+const seenSent = new Set();
+let seenTimer = null;
+function flushSeen() {
+  seenTimer = null;
+  const ids = [...seenQueue].slice(0, 100);
+  ids.forEach((id) => { seenQueue.delete(id); seenSent.add(id); });
+  if (ids.length && hasAccessToken()) apiRequest('/posts/seen/', { method: 'POST', body: JSON.stringify({ ids }) }).catch(() => ids.forEach((id) => seenSent.delete(id)));
+}
+export function markSeen(postId) {
+  if (!postId || seenSent.has(postId) || seenQueue.has(postId)) return;
+  seenQueue.add(postId);
+  if (!seenTimer) seenTimer = window.setTimeout(flushSeen, 2000);
+}
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && seenQueue.size) flushSeen(); });
+
+export const openResource = (postId, resourceId) =>
+  apiRequest(`/posts/${postId}/resources/${resourceId}/open/`, { method: 'POST' }).catch(() => {});
+
+export const fetchPaths = (creator) => apiRequest(`/paths/?creator=${encodeURIComponent(creator)}`);
+export async function fetchPath(pathId) {
+  const path = await apiRequest(`/paths/${pathId}/`);
+  return { ...path, lessons: (path.lessons || []).map(normalizePost) };
+}
+export const savePath = (path, pathId = null) =>
+  apiRequest(pathId ? `/paths/${pathId}/` : '/paths/', { method: pathId ? 'PATCH' : 'POST', body: JSON.stringify(path) });
+export const deletePath = (pathId) => apiRequest(`/paths/${pathId}/`, { method: 'DELETE' });
+
+export const fetchExpertStatus = () => apiRequest('/auth/expert-application/');
+export const applyForExpert = (application) =>
+  apiRequest('/auth/expert-application/', { method: 'POST', body: JSON.stringify(application) });

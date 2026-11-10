@@ -74,5 +74,12 @@ menus). Module names only say a surface exists. They don't show how it is built.
 
 ## Not built yet (next steps)
 
-Impression ("seen") tracking for "You're all caught up", story stickers, two-factor login, and
+Story stickers, two-factor login, and
 HLS transcoding. (Blocking and muting have shipped: `safety/`.)
+
+## Infogram's own features (not on Instagram)
+
+From `Infogram_Pivot.md`, all built: Knowledge Verticals, Utility Score ranking
+with seen tracking ("You're all caught up"), the Resource Drawer (links, PDFs,
+checklists), Learning Paths (profile "Paths" tab, lesson navigation, progress),
+and expert verification (application, admin review, badge, ranking weight).

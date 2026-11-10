@@ -3,6 +3,7 @@ import { Hash, MapPin, Search, X } from 'lucide-react';
 import { searchContent } from '../api';
 import { useApp } from '../context';
 import { readStored, useDebounced, writeStored } from '../hooks';
+import { VerifiedBadge } from '../components/Knowledge';
 
 const RECENT_KEY = 'infogram_recent_searches';
 
@@ -70,7 +71,7 @@ export function SearchPanel({ onClose }) {
           {places.map((placeRow) => <button className="search-result" key={`place-${placeRow.slug}`} onClick={() => pick({ kind: 'place', name: placeRow.name, slug: placeRow.slug, detail: `${placeRow.post_count} posts` })}>
             <span className="hashtag-icon"><MapPin/></span><span><b>{placeRow.name}</b><small>{placeRow.post_count} {placeRow.post_count === 1 ? 'post' : 'posts'}</small></span></button>)}
           {people.map((person) => <button className="search-result" key={`user-${person.name}`} onClick={() => pick({ kind: 'user', name: person.name, avatar: person.avatar, detail: person.bio || `${person.followers} followers` })}>
-            <img src={person.avatar} alt=""/><span><b>{person.name}</b><small>{person.followStatus === 'following' ? 'Following' : person.bio || `${person.followers} followers`}</small></span></button>)}
+            <img src={person.avatar} alt=""/><span><b>{person.name}<VerifiedBadge verified={person.verified}/></b><small>{person.followStatus === 'following' ? 'Following' : person.bio || `${person.followers} followers`}</small></span></button>)}
           {!loading && !people.length && !tags.length && !places.length && <p className="no-results">No results for "{term}".</p>}
         </>}
     </div>

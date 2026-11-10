@@ -10,6 +10,7 @@ import { ActivityPage } from './pages/Activity';
 import { ExplorePage } from './pages/Explore';
 import { HomePage } from './pages/Home';
 import { LocationPage } from './pages/Location';
+import { PathPage } from './pages/Path';
 import { MessagesPage } from './pages/Messages';
 import { ProfilePage } from './pages/Profile';
 import { ReelsPage } from './pages/Reels';
@@ -21,19 +22,22 @@ function parseLocation() {
   const params = new URLSearchParams(search);
   const post = pathname.match(/^\/post\/(\d+)\/?$/);
   if (post) return { page: { name: 'Home' }, postId: Number(post[1]) };
+  const learningPath = pathname.match(/^\/path\/(\d+)\/?$/);
+  if (learningPath) return { page: { name: 'Path', id: Number(learningPath[1]) } };
   const place = pathname.match(/^\/location\/([^/]+)\/?$/);
   if (place) return { page: { name: 'Location', slug: decodeURIComponent(place[1]) } };
   const user = pathname.match(/^\/u\/([^/]+)\/?$/);
   if (user) return { page: { name: 'Profile', username: decodeURIComponent(user[1]) } };
   const simple = { '/explore': 'Explore', '/reels': 'Reels', '/messages': 'Messages', '/activity': 'Activity' }[pathname.replace(/\/$/, '')];
-  if (simple) return { page: { name: simple, topic: params.get('topic') || '' } };
+  if (simple) return { page: { name: simple, topic: params.get('topic') || '', vertical: params.get('vertical') || '' } };
   return { page: { name: 'Home' } };
 }
 
 function pathFor(page) {
   if (page.name === 'Profile') return `/u/${encodeURIComponent(page.username)}`;
   if (page.name === 'Location') return `/location/${encodeURIComponent(page.slug)}`;
-  if (page.name === 'Explore') return page.topic ? `/explore?topic=${encodeURIComponent(page.topic)}` : '/explore';
+  if (page.name === 'Explore') return page.vertical ? `/explore?vertical=${encodeURIComponent(page.vertical)}` : page.topic ? `/explore?topic=${encodeURIComponent(page.topic)}` : '/explore';
+  if (page.name === 'Path') return `/path/${page.id}`;
   return { Reels: '/reels', Messages: '/messages', Activity: '/activity' }[page.name] || '/';
 }
 
@@ -214,7 +218,8 @@ export default function App() {
           <button onClick={() => navigate('Messages')} aria-label="Messages" className="nav-icon"><Send/>{unread.messages > 0 && <i className="nav-badge">{Math.min(unread.messages, 99)}</i>}</button>
         </div></div>
         {page.name === 'Home' && <HomePage createdPost={createdPost} storiesVersion={storiesVersion}/>}
-        {page.name === 'Explore' && <ExplorePage topic={page.topic || ''}/>}
+        {page.name === 'Explore' && <ExplorePage topic={page.topic || ''} vertical={page.vertical || ''}/>}
+        {page.name === 'Path' && <PathPage key={page.id} pathId={page.id}/>}
         {page.name === 'Location' && <LocationPage key={page.slug} slug={page.slug}/>}
         {page.name === 'Reels' && <ReelsPage/>}
         {page.name === 'Messages' && <MessagesPage target={chatTarget} onTargetHandled={() => setChatTarget(null)} unreadMessages={unread.messages}/>}

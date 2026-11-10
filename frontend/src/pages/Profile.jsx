@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bookmark, Camera, Clapperboard, Grid3x3, Heart, Layers, Link2, MessageCircle, MoreHorizontal, Plus, Trash2, X } from 'lucide-react';
-import { avatarOf, changePassword, fetchBlockedAccounts, fetchFollowList, fetchProfile, formatCount, setUserBlocked, setUserMuted, updateProfile, uploadMedia } from '../api';
+import { BadgeCheck, Bookmark, Camera, Clapperboard, Grid3x3, Heart, Layers, Link2, MessageCircle, MoreHorizontal, Plus, Route, Trash2, X } from 'lucide-react';
+import { applyForExpert, avatarOf, changePassword, fetchBlockedAccounts, fetchExpertStatus, fetchFollowList, fetchPaths, fetchProfile, formatCount, setUserBlocked, setUserMuted, updateProfile, uploadMedia } from '../api';
+import { VerifiedBadge, useVerticals } from '../components/Knowledge';
+import { PathEditor } from '../components/PathEditor';
 import { useApp } from '../context';
 import { FollowButton, PeopleModal } from '../components/Sheets';
 
@@ -26,7 +28,25 @@ function LinksModal({ links, onClose }) {
   </section></div>;
 }
 
-const TABS = [['posts', 'Posts', Grid3x3], ['reels', 'Reels', Clapperboard], ['saved', 'Saved', Bookmark]];
+// The creator's syllabus: their Learning Paths as cards.
+function PathShelf({ paths, own, onNew }) {
+  const { navigate } = useApp();
+  const verticals = useVerticals();
+  if (paths === null) return <div className="path-shelf">{Array.from({ length: 2 }, (_, i) => <div key={i} className="path-card skeleton"/>)}</div>;
+  return <div className="path-shelf">
+    {own && <button className="path-card new-path" onClick={onNew}><Plus/><b>New learning path</b><small>Group your posts into a course</small></button>}
+    {paths.map((path) => {
+      const vertical = verticals.find((item) => item.slug === path.vertical);
+      return <button className="path-card" key={path.id} onClick={() => navigate('Path', { id: path.id })}>
+        <span className="path-cover">{path.cover_url ? <img src={path.cover_url} alt="" loading="lazy"/> : <Route/>}<i>{path.lesson_count} {path.lesson_count === 1 ? 'lesson' : 'lessons'}</i></span>
+        <b>{path.title}</b><small>{vertical ? `${vertical.emoji} ${vertical.name}` : 'Learning path'}</small>
+      </button>;
+    })}
+    {!own && !paths.length && <div className="empty-state"><b>No learning paths yet</b><p>When this creator groups posts into a course, it shows up here.</p></div>}
+  </div>;
+}
+
+const TABS = [['posts', 'Posts', Grid3x3], ['reels', 'Reels', Clapperboard], ['paths', 'Paths', Route], ['saved', 'Saved', Bookmark]];
 
 export function ProfilePage({ username, initialTab, startEditing = false }) {
   const { currentUser, setCurrentUser, openPost, openSheet, openReport, openChat, openAbout, followStatusOf, showToast } = useApp();
@@ -40,9 +60,13 @@ export function ProfilePage({ username, initialTab, startEditing = false }) {
   const [linksOpen, setLinksOpen] = useState(false);
   const isMe = isOwn;
 
+  const [paths, setPaths] = useState(null);
+  const [newPath, setNewPath] = useState(false);
+  const loadPaths = () => fetchPaths(username).then(setPaths).catch(() => setPaths([]));
   const load = () => {
     setItems(null);
-    fetchProfile(username, tab)
+    if (tab === 'paths') loadPaths();
+    fetchProfile(username, tab === 'paths' ? 'posts' : tab)
       .then((data) => { setProfile(data.profile); setItems(data.items); setError(''); })
       .catch((requestError) => { setError(requestError.status === 404 ? "Sorry, this page isn't available." : requestError.message); setItems([]); });
   };
@@ -87,7 +111,7 @@ export function ProfilePage({ username, initialTab, startEditing = false }) {
       <img className="profile-avatar" src={isMe ? currentUser.avatar : avatarOf(profile)} alt=""/>
       <div className="profile-details">
         <div className="profile-title">
-          <h1>{profile.username}</h1>
+          <h1>{profile.username}<VerifiedBadge verified={profile.is_verified} title={profile.expert_title}/></h1>
           {isMe && <button onClick={() => setEditing(true)}>Edit profile</button>}
           {!isMe && (profile.is_blocked
             ? <button onClick={toggleBlock}>Unblock</button>
@@ -114,15 +138,17 @@ export function ProfilePage({ username, initialTab, startEditing = false }) {
         ? <div className="private-profile-notice"><b>This account is private</b><p>{followStatus === 'requested' ? 'Your follow request is pending.' : 'Follow this account to see their posts and reels.'}</p></div>
         : <>
           <nav className="profile-tabs">{tabs.map(([key, label, Icon]) => <button className={tab === key ? 'active-profile-tab' : ''} key={key} onClick={() => setTab(key)}><Icon/>{label}</button>)}</nav>
-          {items === null && <div className="profile-grid">{Array.from({ length: 6 }, (_, i) => <div key={i} className="profile-tile skeleton"/>)}</div>}
-          {items?.length === 0 && <div className="empty-state"><b>{tab === 'saved' ? 'Nothing saved yet' : tab === 'reels' ? 'No reels yet' : 'No posts yet'}</b><p>{tab === 'saved' ? 'Tap the bookmark on any post to keep it here. Only you can see this.' : isMe ? 'Share something useful you know.' : ''}</p></div>}
-          <div className="profile-grid">{(items || []).map((post) => <button className="profile-tile" key={post.id} onClick={() => openPost(post, { onDeleted: drop })}>
+          {tab === 'paths' && <PathShelf paths={paths} own={isMe} onNew={() => setNewPath(true)}/>}
+          {tab !== 'paths' && items === null && <div className="profile-grid">{Array.from({ length: 6 }, (_, i) => <div key={i} className="profile-tile skeleton"/>)}</div>}
+          {tab !== 'paths' && items?.length === 0 && <div className="empty-state"><b>{tab === 'saved' ? 'Nothing saved yet' : tab === 'reels' ? 'No reels yet' : 'No posts yet'}</b><p>{tab === 'saved' ? 'Tap the bookmark on any post to keep it here. Only you can see this.' : isMe ? 'Share something useful you know.' : ''}</p></div>}
+          {tab !== 'paths' && <div className="profile-grid">{(items || []).map((post) => <button className="profile-tile" key={post.id} onClick={() => openPost(post, { onDeleted: drop })}>
             {post.mediaType === 'video' && !post.poster ? <video src={post.image} muted preload="metadata"/> : <img src={post.poster || post.image} alt={post.caption.slice(0, 80)} loading="lazy"/>}
             {post.mediaType === 'video' && <Clapperboard className="profile-tile-badge"/>}
             {post.mediaType === 'carousel' && <Layers className="profile-tile-badge"/>}
             <span className="tile-stats"><span><Heart fill="currentColor"/>{formatCount(post.likeCount)}</span><span><MessageCircle fill="currentColor"/>{formatCount(post.commentCount)}</span></span>
-          </button>)}</div>
+          </button>)}</div>}
         </>}
+    {newPath && <PathEditor onClose={() => setNewPath(false)} onSaved={() => { setNewPath(false); loadPaths(); }}/>}
     {peopleList && <PeopleModal title={peopleList.title} load={peopleList.load} onClose={() => setPeopleList(null)}/>}
     {editing && <ProfileEditModal onClose={() => setEditing(false)} onSaved={(user) => { setCurrentUser(user); setProfile((current) => ({ ...current, ...user })); }}/>}
     {linksOpen && <LinksModal links={profile.links} onClose={() => setLinksOpen(false)}/>}
@@ -199,6 +225,7 @@ function ProfileEditModal({ onClose, onSaved }) {
           <input type="password" autoComplete="new-password" placeholder="Confirm new password" minLength="8" value={passwords.confirm} onChange={(event) => setPasswords({ ...passwords, confirm: event.target.value })}/>
           <small>Changing it signs you out on other devices.</small>
         </fieldset>}
+      <ExpertSection/>
       <button type="button" className="text-button" onClick={() => setBlocked(true)}>Blocked accounts</button>
       {error && <p className="auth-error" role="alert">{error}</p>}
       <div className="create-footer"><span>{busy || 'Keep your profile informative'}</span><button disabled={Boolean(busy)}>{busy ? 'Please wait…' : 'Save'}</button></div>
@@ -213,4 +240,50 @@ function BlockedModal({ onClose }) {
     renderAction={(person, { remove }) => <button className="person-follow" onClick={async () => {
       try { await setUserBlocked(person.name, false); remove(person.name); showToast(`${person.name} is unblocked`); } catch (error) { showToast(error.message); }
     }}>Unblock</button>}/>;
+}
+
+// Expert verification: badge status, or apply (staff review it in admin).
+function ExpertSection() {
+  const verticals = useVerticals();
+  const [status, setStatus] = useState(null);
+  const [form, setForm] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { fetchExpertStatus().then(setStatus).catch(() => setStatus({ is_verified: false, application: null })); }, []);
+  if (!status) return null;
+  const vertical = (slug) => verticals.find((item) => item.slug === slug);
+  const submit = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const application = await applyForExpert(form);
+      setStatus((current) => ({ ...current, application }));
+      setForm(null);
+    } catch (requestError) { setError(requestError.message); } finally { setBusy(false); }
+  };
+  const pending = status.application?.status === 'pending';
+  return <fieldset className="expert-section"><legend><BadgeCheck/>Expert verification</legend>
+    {status.is_verified
+      ? <p className="expert-status verified">You're a verified expert in {vertical(status.expert_vertical)?.name || status.expert_vertical}: <b>{status.expert_title}</b>. Your posts in that vertical rank higher.</p>
+      : pending
+        ? <p className="expert-status">Your application for {vertical(status.application.vertical)?.name || status.application.vertical} is being reviewed.</p>
+        : form === null
+          ? <>
+            <p className="expert-status">{status.application?.status === 'rejected' ? "Your last application wasn't approved. You can apply again with more evidence." : 'Professionals can apply for a badge. Verified experts get a ranking boost in their vertical.'}</p>
+            <button type="button" className="text-button" onClick={() => setForm({ vertical: '', title: '', evidence_url: '', note: '' })}>Apply for verification</button>
+          </>
+          : <div className="expert-form">
+            <select value={form.vertical} onChange={(event) => setForm({ ...form, vertical: event.target.value })} aria-label="Vertical">
+              <option value="">Choose your vertical…</option>
+              {verticals.map((item) => <option key={item.slug} value={item.slug}>{item.emoji} {item.name}</option>)}
+            </select>
+            <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder='Credential, e.g. "Chartered Accountant"' maxLength="80"/>
+            <input value={form.evidence_url} onChange={(event) => setForm({ ...form, evidence_url: event.target.value })} placeholder="Link to proof (licence, employer page, publication)" inputMode="url" maxLength="500"/>
+            <textarea value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="Anything else reviewers should know (optional)" rows="2" maxLength="1000"/>
+            {error && <p className="auth-error" role="alert">{error}</p>}
+            <div className="expert-form-actions"><button type="button" className="text-button" onClick={() => setForm(null)}>Cancel</button>
+              <button type="button" className="expert-submit" onClick={submit} disabled={busy || !form.vertical || !form.title.trim() || !form.evidence_url.trim()}>{busy ? 'Sending…' : 'Submit application'}</button></div>
+          </div>}
+  </fieldset>;
 }

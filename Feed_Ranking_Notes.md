@@ -18,28 +18,38 @@ model.
 - Explore removes the current user and followed creators from its candidate
   set.
 
-## Current score
+## Current score: Utility first
+
+Infogram ranks by **Utility Score**, as in `Infogram_Pivot.md`: how often people who
+*saw* a post found it worth keeping or discussing, boosted for verified experts.
 
 ```text
+utility = (saves*1 + comments*0.5 + likes*0.25 + 1) / (views + 10) * expert_weight
+expert_weight = 1.5  verified expert posting in their own vertical
+              = 1.2  verified expert posting elsewhere
+              = 1.0  everyone else
+
 score =
-  likes * 1
-  + comments * 3
-  + saves * 5
-  + own-post bonus 25
-  + followed-author bonus 30
-  + last-24-hours bonus 20
-  + last-7-days bonus 8
-  + non-empty-topic bonus 15
+  utility * 300
+  + (likes + comments*3 + saves*5) * 0.3     raw engagement, kept small
+  + own-post bonus 25 / followed-author bonus 30
+  + last-24-hours bonus 20 / last-7-days bonus 8
+  + vertical-or-topic bonus 15
   + video bonus 4 / carousel bonus 2
+  - 60 if you've already seen it
 ```
 
-Home `for_you` orders by `(tier, score, created_at, id)`. The others order by `(score, created_at, id)`.
+* **Views** come from `PostView`: the first time a post is at least 60% on screen
+  for a second (`POST /posts/seen/`), or opened in the post view. They are the
+  denominator, so a post that 30 people scrolled past and 3 saved ranks below one
+  that 3 people saw and all 3 saved.
+* The **+1 / +10** smoothing stops a brand-new post with one view and one save
+  from topping everything.
+* **Seen posts** sink below unseen ones in the same tier. The home feed shows
+  "You're all caught up" before the first seen or suggested post.
 
-Saves and comments are intentionally stronger than likes because Infogram is
-for useful, revisitable information. This is a baseline, not a final ML model.
-The next iteration should add impression/view events, topic affinity, creator
-quality/verification, negative feedback, diversity constraints, and offline
-evaluation before changing weights.
+Home `for_you` orders by `(tier, score, created_at, id)`. The others order by `(score, created_at, id)`.
+Feeds, reels and explore also take `?vertical=<slug>` (Knowledge Verticals).
 
 ## API examples
 

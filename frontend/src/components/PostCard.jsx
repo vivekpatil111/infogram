@@ -6,6 +6,7 @@ import { Caption, MediaView } from './Media';
 import { usePostEngagement, usePostMenu } from './postActions';
 import { FollowButton } from './Sheets';
 import { EmojiButton, insertAtCaret } from './Emoji';
+import { PathChip, ResourceButton, VerifiedBadge, VerticalPill, useSeen } from './Knowledge';
 
 const CAPTION_PREVIEW = 125;
 
@@ -19,6 +20,8 @@ export function PostCard({ post, onHidden, onDeleted, onCommentAdded }) {
   const [posting, setPosting] = useState(false);
   const [myComments, setMyComments] = useState([]);
   const inputRef = useRef(null);
+  const cardRef = useRef(null);
+  useSeen(cardRef, post.id);
   const longCaption = (post.caption || '').length > CAPTION_PREVIEW || (post.caption || '').split('\n').length > 2;
   const caption = longCaption && !expanded ? `${post.caption.slice(0, CAPTION_PREVIEW).split('\n').slice(0, 2).join('\n').trimEnd()}…` : post.caption;
   const submitComment = async (event) => {
@@ -33,12 +36,12 @@ export function PostCard({ post, onHidden, onDeleted, onCommentAdded }) {
       onCommentAdded?.(post.id);
     } catch (error) { showToast(`Comment: ${error.message}`); } finally { setPosting(false); }
   };
-  return <article className="post">
+  return <article className="post" ref={cardRef}>
     {post.isSuggested && <div className="post-suggested-label">Suggested for you</div>}
     <header className="post-header">
       <button className="avatar-button" onClick={() => openProfile(post.name)}><img className="avatar" src={post.avatar} alt=""/></button>
       <div className="post-author">
-        <b role="button" tabIndex={0} onClick={() => openProfile(post.name)}>{post.name}</b>
+        <b role="button" tabIndex={0} onClick={() => openProfile(post.name)}>{post.name}<VerifiedBadge verified={post.verified} title={post.expertTitle}/></b>
         {post.location
           ? <span role="button" tabIndex={0} className="post-location" onClick={() => navigate('Location', { slug: post.location.slug })}>{post.location.name}</span>
           : post.place && <span role="button" tabIndex={0} onClick={() => navigate('Explore', { topic: post.place })}>{post.place}</span>}
@@ -53,9 +56,13 @@ export function PostCard({ post, onHidden, onDeleted, onCommentAdded }) {
         <button onClick={() => inputRef.current?.focus()} aria-label="Comment"><MessageCircle/></button>
         <button onClick={() => openShare(post)} aria-label="Share"><Send/></button>
       </div>
-      <button onClick={toggleSave} className={saved ? 'saved' : ''} aria-label={saved ? 'Remove from saved' : 'Save'}><Bookmark fill={saved ? 'currentColor' : 'none'}/></button>
+      <div className="post-actions-right">
+        <ResourceButton post={post}/>
+        <button onClick={toggleSave} className={saved ? 'saved' : ''} aria-label={saved ? 'Remove from saved' : 'Save'}><Bookmark fill={saved ? 'currentColor' : 'none'}/></button>
+      </div>
     </div>
     <div className="post-copy">
+      {(post.paths.length > 0 || post.vertical) && <div className="post-knowledge"><PathChip paths={post.paths}/>{!post.paths.length && <VerticalPill slug={post.vertical}/>}</div>}
       {likeCount > 0 ? <button className="like-count" onClick={() => openLikes(post.id)}>{formatCount(likeCount)} {likeCount === 1 ? 'like' : 'likes'}</button> : <span className="like-count muted-text">Be the first to like this</span>}
       {post.caption && <p className="post-caption"><b role="button" tabIndex={0} onClick={() => openProfile(post.name)}>{post.name}</b> <Caption text={caption} onHashtag={(tag) => navigate('Explore', { topic: `#${tag}` })}/>
         {longCaption && !expanded && <button className="caption-more" onClick={() => setExpanded(true)}>more</button>}</p>}

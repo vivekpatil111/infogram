@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import { fetchFeedPage, fetchStoryTray, fetchSuggestions } from '../api';
 import { useApp } from '../context';
 import { useInfiniteList } from '../hooks';
@@ -26,6 +27,10 @@ export function HomePage({ createdPost, storiesVersion }) {
   const dropPost = (post) => feed.setItems((current) => current.filter((item) => item.id !== post.id));
   const bumpComments = (postId) => feed.setItems((current) => current.map((item) => (item.id === postId ? { ...item, commentCount: item.commentCount + 1 } : item)));
   const posts = feed.items || [];
+  // "You're all caught up" sits before the first post you've already seen or
+  // that comes from outside your network (both are ranked after unseen ones).
+  const caughtUpAt = posts.findIndex((post) => post.seenByMe || post.isSuggested);
+  const showCaughtUp = caughtUpAt > 0 || (caughtUpAt === 0 && posts[0].seenByMe);
 
   return <>
     <div className="feed-column">
@@ -35,7 +40,13 @@ export function HomePage({ createdPost, storiesVersion }) {
         <b>Welcome to Infogram</b><p>Follow creators to fill your feed with useful posts, or share your first one.</p>
         <div><button onClick={() => navigate('Explore')}>Explore creators</button><button onClick={() => openCreate('post')}>Create a post</button></div>
       </div>}
-      {posts.map((post) => <PostCard key={post.id} post={post} onHidden={dropPost} onDeleted={dropPost} onCommentAdded={bumpComments}/>)}
+      {posts.map((post, index) => <React.Fragment key={post.id}>
+        {showCaughtUp && index === caughtUpAt && <div className="caught-up" role="status">
+          <span className="caught-up-icon"><CheckCircle2/></span><b>You're all caught up</b>
+          <small>{post.isSuggested ? "You've seen all new posts from accounts you follow. Here are some suggestions." : "You've seen all new posts. Older posts are below."}</small>
+        </div>}
+        <PostCard post={post} onHidden={dropPost} onDeleted={dropPost} onCommentAdded={bumpComments}/>
+      </React.Fragment>)}
       {feed.error && <div className="empty-state"><p>{feed.error}</p><button onClick={feed.reload}>Try again</button></div>}
       <div ref={feed.sentinelRef} className="scroll-sentinel">{feed.loading && feed.items !== null ? <Spinner/> : posts.length > 0 && !feed.next ? "You're all caught up" : ''}</div>
     </div>

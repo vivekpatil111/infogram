@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { MapPin, X } from 'lucide-react';
+import { CheckSquare, FileText, Link2, MapPin, Trash2, X } from 'lucide-react';
 import { createPost, createStory, fetchLocations, normalizePost, uploadMedia } from '../api';
 import { useDebounced } from '../hooks';
+import { useVerticals } from './Knowledge';
+
+const MAX_RESOURCES = 5;
 import { useApp } from '../context';
 
 const MAX_BYTES = 100 * 1024 * 1024;
@@ -15,6 +18,20 @@ export function CreateSheet({ initialType = 'post', onClose, onCreated }) {
   const [files, setFiles] = useState([]);
   const [caption, setCaption] = useState('');
   const [topic, setTopic] = useState('');
+  const verticals = useVerticals();
+  const [vertical, setVertical] = useState('');
+  const [resources, setResources] = useState([]); // {kind, title, url, itemsText, file?}
+  const addResource = (kind) => setResources((current) => (current.length >= MAX_RESOURCES ? current : [...current, { kind, title: '', url: '', itemsText: '' }]));
+  const patchResource = (index, change) => setResources((current) => current.map((item, i) => (i === index ? { ...item, ...change } : item)));
+  const choosePdf = (index, event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (file.type !== 'application/pdf') { setError('Choose a PDF file.'); return; }
+    if (file.size > 20 * 1024 * 1024) { setError('PDFs must be 20 MB or smaller.'); return; }
+    setError('');
+    patchResource(index, { file, title: resources[index].title || file.name.replace(/\.pdf$/i, '') });
+  };
   const [place, setPlace] = useState('');
   const [placeFocused, setPlaceFocused] = useState(false);
   const [placeOptions, setPlaceOptions] = useState([]);
@@ -53,6 +70,19 @@ export function CreateSheet({ initialType = 'post', onClose, onCreated }) {
         setProgress(files.length > 1 ? `Uploading ${index + 1} of ${files.length}…` : 'Uploading…');
         uploaded.push(await uploadMedia(item.file));
       }
+      const resourceBody = [];
+      for (const item of resources) {
+        if (item.kind === 'checklist') {
+          const lines = item.itemsText.split('\n').map((line) => line.trim()).filter(Boolean);
+          if (lines.length) resourceBody.push({ kind: 'checklist', title: item.title.trim() || 'Checklist', items: lines });
+        } else if (item.kind === 'pdf' && item.file) {
+          setProgress('Uploading PDF…');
+          resourceBody.push({ kind: 'pdf', title: item.title.trim() || 'Guide', url: (await uploadMedia(item.file)).media_url });
+        } else if (item.kind === 'link' && item.url.trim()) {
+          const url = /^https?:\/\//i.test(item.url.trim()) ? item.url.trim() : `https://${item.url.trim()}`;
+          resourceBody.push({ kind: 'link', title: item.title.trim() || url.replace(/^https?:\/\//, '').split('/')[0], url });
+        }
+      }
       setProgress('Publishing…');
       if (type === 'story') {
         await createStory({ mediaType: uploaded[0].media_type, mediaUrl: uploaded[0].media_url, caption: caption.trim().slice(0, 180) });
@@ -62,7 +92,7 @@ export function CreateSheet({ initialType = 'post', onClose, onCreated }) {
         const body = uploaded.length > 1
           ? { media: uploaded.map((item) => ({ media_type: item.media_type, media_url: item.media_url })) }
           : { media_type: uploaded[0].media_type, media_url: uploaded[0].media_url };
-        const created = await createPost({ ...body, topic: topic.trim(), caption: caption.trim(), ...(place.trim() ? { location: place.trim() } : {}) });
+        const created = await createPost({ ...body, topic: topic.trim(), caption: caption.trim(), vertical, resources: resourceBody, ...(place.trim() ? { location: place.trim() } : {}) });
         showToast(type === 'reel' ? 'Reel shared' : 'Post shared');
         onCreated?.(type, normalizePost(created));
       }
@@ -92,7 +122,11 @@ export function CreateSheet({ initialType = 'post', onClose, onCreated }) {
         <b>{type === 'reel' ? 'Select a video' : type === 'story' ? 'Select a photo or video' : 'Select photos or videos'}</b>
         <small>{type === 'post' ? 'Add up to 10 to make a carousel' : type === 'story' ? 'Stories disappear after 24 hours' : 'Share a short, useful video'}</small></label>}
     <form className="create-form" onSubmit={publish}>
-      {type !== 'story' && <input value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="Topic (e.g. Personal finance)" maxLength="80"/>}
+      {type !== 'story' && verticals.length > 0 && <div className="vertical-picker" role="radiogroup" aria-label="Knowledge Vertical">
+        {verticals.map((item) => <button type="button" key={item.slug} role="radio" aria-checked={vertical === item.slug} className={vertical === item.slug ? 'active' : ''}
+          onClick={() => setVertical(vertical === item.slug ? '' : item.slug)}>{item.emoji} {item.name}</button>)}
+      </div>}
+      {type !== 'story' && <input value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="Topic (e.g. How to register a company)" maxLength="80"/>}
       {type !== 'story' && <div className="location-input">
         <MapPin/>
         <input value={place} onChange={(event) => setPlace(event.target.value)} onFocus={() => setPlaceFocused(true)} onBlur={() => window.setTimeout(() => setPlaceFocused(false), 150)}
@@ -105,6 +139,24 @@ export function CreateSheet({ initialType = 'post', onClose, onCreated }) {
         </div>}
       </div>}
       <textarea value={caption} onChange={(event) => setCaption(event.target.value)} placeholder={type === 'story' ? 'Add a caption (optional)' : 'Write a caption… use #hashtags'} rows="3" maxLength={type === 'story' ? 180 : 2200}/>
+      {type !== 'story' && <div className="resource-editor">
+        <div className="resource-editor-head"><b>Resources</b><small>Links, PDF guides and checklists people can open from your post</small></div>
+        {resources.map((item, index) => <div className={`resource-edit ${item.kind}`} key={index}>
+          <span className="resource-edit-kind">{item.kind === 'link' ? <Link2/> : item.kind === 'pdf' ? <FileText/> : <CheckSquare/>}</span>
+          <div className="resource-edit-fields">
+            <input value={item.title} onChange={(event) => patchResource(index, { title: event.target.value })} placeholder={item.kind === 'checklist' ? 'Checklist title' : 'Title'} maxLength="80" aria-label="Resource title"/>
+            {item.kind === 'link' && <input value={item.url} onChange={(event) => patchResource(index, { url: event.target.value })} placeholder="https://…" inputMode="url" maxLength="500" aria-label="Resource link"/>}
+            {item.kind === 'pdf' && <label className="pdf-pick"><input type="file" accept="application/pdf" hidden onChange={(event) => choosePdf(index, event)}/>{item.file ? `${item.file.name} · ${(item.file.size / 1048576).toFixed(1)} MB` : 'Choose a PDF (max 20 MB)'}</label>}
+            {item.kind === 'checklist' && <textarea value={item.itemsText} onChange={(event) => patchResource(index, { itemsText: event.target.value })} placeholder={'One step per line\nPAN card\nAddress proof'} rows="3" aria-label="Checklist items"/>}
+          </div>
+          <button type="button" onClick={() => setResources((current) => current.filter((_, i) => i !== index))} aria-label="Remove resource"><Trash2/></button>
+        </div>)}
+        {resources.length < MAX_RESOURCES && <div className="resource-add">
+          <button type="button" onClick={() => addResource('link')}><Link2/>Link</button>
+          <button type="button" onClick={() => addResource('pdf')}><FileText/>PDF</button>
+          <button type="button" onClick={() => addResource('checklist')}><CheckSquare/>Checklist</button>
+        </div>}
+      </div>}
       {error && <p className="auth-error" role="alert">{error}</p>}
       <div className="create-footer"><span>{progress || (type === 'story' ? 'Visible to your followers for 24h' : 'Informative content only')}</span><button disabled={!files.length || Boolean(progress)}>{progress ? 'Please wait…' : 'Share'}</button></div>
     </form>

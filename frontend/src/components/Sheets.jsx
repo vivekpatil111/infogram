@@ -4,6 +4,7 @@ import { REPORT_REASONS, avatarOf, createConversation, fetchFollowList, fetchLik
 import { useApp } from '../context';
 import { useDebounced } from '../hooks';
 import { ListSkeleton } from './Skeleton';
+import { VerifiedBadge } from './Knowledge';
 
 const stop = (event) => event.stopPropagation();
 export const followLabel = (status) => (status === 'requested' ? 'Requested' : status === 'following' ? 'Following' : 'Follow');
@@ -57,7 +58,7 @@ function PersonRow({ person, action, onOpen }) {
   return <div className="person-row">
     <button className="person-main" onClick={() => onOpen(person.name)}>
       <img src={person.avatar} alt=""/>
-      <span><b>{person.name}</b><small>{person.reason || person.bio || `${person.followers} followers`}</small></span>
+      <span><b>{person.name}<VerifiedBadge verified={person.verified}/></b><small>{person.reason || person.bio || `${person.followers} followers`}</small></span>
     </button>
     {action}
   </div>;

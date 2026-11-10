@@ -4,6 +4,7 @@ import { formatCount, postLink } from '../api';
 import { useApp } from '../context';
 import { usePostEngagement } from './postActions';
 import { FollowButton } from './Sheets';
+import { ResourceButton, VerifiedBadge } from './Knowledge';
 
 export function ReelCard({ reel, onHidden }) {
   const { currentUser, openProfile, openPost, openShare, openSheet, openReport, openAbout, showToast } = useApp();
@@ -42,10 +43,11 @@ export function ReelCard({ reel, onHidden }) {
       {reel.place && <span className="reel-topic">{reel.place}</span>}
       <div className="reel-profile">
         <button className="avatar-button" onClick={() => openProfile(reel.name)}><img src={reel.avatar} alt=""/></button>
-        <b role="button" tabIndex={0} onClick={() => openProfile(reel.name)}>{reel.name}</b>
+        <b role="button" tabIndex={0} onClick={() => openProfile(reel.name)}>{reel.name}<VerifiedBadge verified={reel.verified} title={reel.expertTitle}/></b>
         {(reel.followStatus === 'none' || reel.followStatus === 'requested') && <FollowButton name={reel.name} initialStatus={reel.followStatus} className="reel-follow"/>}
       </div>
       {reel.caption && <p>{reel.caption}</p>}
+      <ResourceButton post={reel} className="on-dark"/>
     </div>
     <div className="reel-actions">
       <button className={liked ? 'reel-liked' : ''} onClick={() => toggleLike()} aria-label={liked ? 'Unlike' : 'Like'}><Heart fill={liked ? 'currentColor' : 'none'}/><span>{formatCount(likeCount)}</span></button>

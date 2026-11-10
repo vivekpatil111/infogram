@@ -1,15 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send, X } from 'lucide-react';
-import { addPostComment, deleteComment, fetchComments, fetchPost, formatCount, setCommentLike } from '../api';
+import { Bookmark, ChevronLeft, ChevronRight, Heart, MessageCircle, MoreHorizontal, Route, Send, X } from 'lucide-react';
+import { addPostComment, deleteComment, fetchComments, fetchPost, formatCount, markSeen, setCommentLike } from '../api';
 import { useApp } from '../context';
 import { Caption, MediaView } from './Media';
 import { usePostEngagement, usePostMenu } from './postActions';
 import { FollowButton } from './Sheets';
 import { ListSkeleton, Spinner } from './Skeleton';
 import { EmojiButton, insertAtCaret } from './Emoji';
+import { PathChip, ResourceButton, VerifiedBadge } from './Knowledge';
 
 // Post detail: media, caption and the full comment thread.
-export function PostModal({ postOrId, onClose, onCommentAdded, onDeleted }) {
+export function PostModal({ postOrId, onClose, onCommentAdded, onDeleted, lesson }) {
   const [post, setPost] = useState(typeof postOrId === 'object' ? postOrId : null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -19,13 +20,13 @@ export function PostModal({ postOrId, onClose, onCommentAdded, onDeleted }) {
   return <div className="modal-backdrop post-modal-backdrop" onClick={onClose}>
     <button className="post-modal-close" onClick={onClose} aria-label="Close"><X/></button>
     <section className="post-modal" onClick={(event) => event.stopPropagation()}>
-      {post ? <PostDetail post={post} onClose={onClose} onCommentAdded={onCommentAdded} onDeleted={onDeleted}/>
+      {post ? <PostDetail post={post} onClose={onClose} onCommentAdded={onCommentAdded} onDeleted={onDeleted} lesson={lesson}/>
         : <p className="post-modal-status">{error || <Spinner/>}</p>}
     </section>
   </div>;
 }
 
-function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
+function PostDetail({ post, onClose, onCommentAdded, onDeleted, lesson }) {
   const { currentUser, openProfile, openShare, openReport, openLikes, navigate, showToast } = useApp();
   const { liked, likeCount, saved, toggleLike, toggleSave } = usePostEngagement(post);
   const openMenu = usePostMenu();
@@ -36,6 +37,7 @@ function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
   const [replies, setReplies] = useState({}); // parentId -> comment[] once opened
   const inputRef = useRef(null);
   useEffect(() => { fetchComments(post.id).then(setComments).catch(() => setComments([])); }, [post.id]);
+  useEffect(() => { markSeen(post.id); }, [post.id]); // opening a post is a view
   const goProfile = (name) => { onClose(); openProfile(name); };
   const submit = async (event) => {
     event.preventDefault();
@@ -112,13 +114,14 @@ function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
     <div className="post-modal-side">
       <header className="post-header">
         <button className="avatar-button" onClick={() => goProfile(post.name)}><img className="avatar" src={post.avatar} alt=""/></button>
-        <div className="post-author"><b role="button" tabIndex={0} onClick={() => goProfile(post.name)}>{post.name}</b>
+        <div className="post-author"><b role="button" tabIndex={0} onClick={() => goProfile(post.name)}>{post.name}<VerifiedBadge verified={post.verified} title={post.expertTitle}/></b>
           {post.location
             ? <span role="button" tabIndex={0} className="post-location" onClick={() => { onClose(); navigate('Location', { slug: post.location.slug }); }}>{post.location.name}</span>
             : post.place && <span>{post.place}</span>}</div>
         <FollowButton name={post.name} initialStatus={post.followStatus} className="follow-inline"/>
         <button className="icon-button" onClick={() => openMenu(post, { inModal: true, onDeleted: (deleted) => { onClose(); onDeleted?.(deleted); } })} aria-label="Post options"><MoreHorizontal/></button>
       </header>
+      {lesson ? <LessonBar lesson={lesson}/> : post.paths.length > 0 && <div className="modal-path"><PathChip paths={post.paths}/></div>}
       <div className="post-modal-comments">
         {post.caption && <div className="comment"><img src={post.avatar} alt=""/><p><b>{post.name}</b> <Caption text={post.caption} onHashtag={(tag) => { onClose(); navigate('Explore', { topic: `#${tag}` }); }}/><span>{post.time}</span></p></div>}
         {comments === null && <ListSkeleton rows={3}/>}
@@ -138,7 +141,10 @@ function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
           <button onClick={() => inputRef.current?.focus()} aria-label="Comment"><MessageCircle/></button>
           <button onClick={() => openShare(post)} aria-label="Share"><Send/></button>
         </div>
-        <button onClick={toggleSave} className={saved ? 'saved' : ''} aria-label={saved ? 'Remove from saved' : 'Save'}><Bookmark fill={saved ? 'currentColor' : 'none'}/></button>
+        <div className="post-actions-right">
+          <ResourceButton post={post}/>
+          <button onClick={toggleSave} className={saved ? 'saved' : ''} aria-label={saved ? 'Remove from saved' : 'Save'}><Bookmark fill={saved ? 'currentColor' : 'none'}/></button>
+        </div>
       </div>
       <div className="post-copy">{likeCount > 0 ? <button className="like-count" onClick={() => openLikes(post.id)}>{formatCount(likeCount)} {likeCount === 1 ? 'like' : 'likes'}</button> : <span className="like-count muted-text">Be the first to like this</span>}<span className="timestamp">{post.time}</span></div>
       {replyTo && <div className="replying-to">Replying to <b>{replyTo.name}</b><button type="button" onClick={() => { setReplyTo(null); setText(''); }} aria-label="Cancel reply"><X/></button></div>}
@@ -149,4 +155,17 @@ function PostDetail({ post, onClose, onCommentAdded, onDeleted }) {
       </form>
     </div>
   </>;
+}
+
+
+// "Lesson 2 of 5" with previous / next when a post is opened from a Learning Path.
+function LessonBar({ lesson }) {
+  const { openPost, navigate } = useApp();
+  const go = (index) => openPost(lesson.ids[index], { lesson: { ...lesson, index } });
+  return <div className="lesson-bar">
+    <button className="lesson-path" onClick={() => navigate('Path', { id: lesson.pathId })}><Route/><span>{lesson.title}</span></button>
+    <span className="lesson-count">Lesson {lesson.index + 1} of {lesson.ids.length}</span>
+    <button onClick={() => go(lesson.index - 1)} disabled={lesson.index === 0} aria-label="Previous lesson"><ChevronLeft/></button>
+    <button onClick={() => go(lesson.index + 1)} disabled={lesson.index >= lesson.ids.length - 1} aria-label="Next lesson"><ChevronRight/></button>
+  </div>;
 }
